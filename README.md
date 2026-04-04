@@ -1,2 +1,2 @@
-# Baek-Ho World
+# samoyed_baekho
 
