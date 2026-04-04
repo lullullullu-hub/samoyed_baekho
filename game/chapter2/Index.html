@@ -1,0 +1,1866 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>조백호의 여행 - 2장: 시내 탐험</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:#0d0d1a;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;margin:0;overflow:hidden;}
+#wrap{position:relative;width:100vw;max-height:100vh;}
+canvas{display:block;width:100%;height:auto;image-rendering:pixelated;cursor:pointer;}
+#ov{position:fixed;inset:0;background:rgba(0,0,0,0.82);display:none;align-items:center;justify-content:center;z-index:20;}
+.pnl{background:#0e0e1e;border:3px solid #ffd700;padding:clamp(10px,2vw,20px);max-width:min(96vw,900px);width:96%;text-align:center;color:#fff;font-family:'Courier New',monospace;max-height:92vh;overflow-y:auto;touch-action:auto;position:relative;z-index:30;}
+.pnl h2{color:#ffd700;font-size:clamp(22px,4vw,40px);margin-bottom:8px;}
+.pnl p{font-size:clamp(18px,2.5vw,26px);color:#bbb;line-height:1.8;margin-bottom:10px;}
+.btn{background:#ffd700;color:#111;border:none;padding:clamp(9px,1.4vw,18px) clamp(18px,2.7vw,32px);font-size:clamp(18px,2.8vw,32px);cursor:pointer;font-weight:700;margin:3px;font-family:'Courier New',monospace;}
+.btn:hover{background:#ffe94c;}
+.btn.g{background:#69f0ae;color:#111;}
+.btn.b{background:#82b1ff;color:#111;}
+.btn.r{background:#ff5252;color:#fff;}
+.btn.p{background:#ce93d8;color:#111;}
+.tut-row{display:flex;align-items:center;gap:10px;margin:5px 0;text-align:left;}
+.tut-icon{font-size:clamp(18px,2.5vw,26px);width:28px;flex-shrink:0;}
+.tut-text{font-size:clamp(16px,2.2vw,24px);color:#ccc;line-height:1.6;}
+.btn-row{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-top:10px;}
+.mg-desc{color:#fff;font-size:clamp(16px,2.2vw,24px);}
+.mg-sub{color:#aaa;font-size:clamp(14px,1.8vw,20px);}
+.mg-hi{color:#ffd700;font-weight:bold;font-size:clamp(16px,2.2vw,24px);}
+/* 숨은그림 게임 */
+.hg-wrap{position:relative;display:inline-block;margin:6px auto;}
+.hg-wrap canvas{border:2px solid #ffd700;cursor:crosshair;image-rendering:pixelated;}
+/* 커피 게임 */
+.recipe-step{background:#1a1a30;border:1px solid #444;padding:8px 12px;margin:4px 0;cursor:pointer;font-size:clamp(14px,1.8vw,20px);border-radius:4px;transition:background .15s;}
+.recipe-step:hover{background:#2a2a50;border-color:#ffd700;}
+.recipe-step.done{background:#1a3020;border-color:#69f0ae;color:#69f0ae;}
+.recipe-step.wrong{background:#3a1020;border-color:#ff5252;color:#ff5252;}
+/* 인벤토리 */
+#inv-panel{position:absolute;right:10px;top:50px;background:rgba(14,14,30,0.95);border:2px solid #ffd700;padding:10px;display:none;z-index:15;font-family:'Courier New',monospace;}
+</style>
+<script>
+// ═══════════════════════════════════════════════════════
+//  조백호의 여행 - 공통 오디오 엔진 v1.0 (인라인)
+//  ChoBGM.play(n) / stop() / pause() / resume()
+//  ChoSFX.jump() / npc() / hit() / item()
+//  ChoAudio.toggleMute()
+// ═══════════════════════════════════════════════════════
+(function(){
+'use strict';
+let _ctx=null;
+function getCtx(){
+  if(!_ctx)_ctx=new(window.AudioContext||window.webkitAudioContext)();
+  if(_ctx.state==='suspended')_ctx.resume();
+  return _ctx;
+}
+['touchstart','mousedown','keydown'].forEach(ev=>document.addEventListener(ev,()=>{if(_ctx&&_ctx.state==='suspended')_ctx.resume();},{passive:true}));
+function playNote(freq,type,start,dur,vol,mg){
+  const ctx=getCtx();const osc=ctx.createOscillator();const g=ctx.createGain();
+  osc.connect(g);g.connect(mg||ctx.destination);
+  osc.type=type||'square';osc.frequency.setValueAtTime(freq,start);
+  g.gain.setValueAtTime(vol||0.18,start);
+  g.gain.exponentialRampToValueAtTime(0.001,start+dur-0.01);
+  osc.start(start);osc.stop(start+dur);
+}
+const N={
+  C3:130.81,D3:146.83,E3:164.81,F3:174.61,G3:196.00,A3:220.00,B3:246.94,
+  C4:261.63,D4:293.66,E4:329.63,F4:349.23,G4:392.00,A4:440.00,B4:493.88,
+  C5:523.25,D5:587.33,E5:659.25,F5:698.46,G5:783.99,A5:880.00,B5:987.77,
+  C6:1046.50,D6:1174.66,E6:1318.51,
+  Cs4:277.18,Ds4:311.13,Fs4:369.99,Gs4:415.30,As4:466.16,
+  Cs5:554.37,Ds5:622.25,Fs5:739.99,Gs5:830.61,As5:932.33,
+  Cs3:138.59,Ds3:155.56,Fs3:185.00,Gs3:207.65,As3:233.08,R:0
+};
+const SONGS={
+  1:{bpm:148,tracks:[
+    {type:'square',vol:0.13,notes:[
+      {f:'E5',d:.5},{f:'E5',d:.5},{f:'G5',d:.5},{f:'E5',d:.5},{f:'C5',d:.5},{f:'D5',d:.5},{f:'E5',d:1},
+      {f:'D5',d:.5},{f:'D5',d:.5},{f:'F5',d:.5},{f:'D5',d:.5},{f:'B4',d:.5},{f:'C5',d:.5},{f:'D5',d:1},
+      {f:'C5',d:.5},{f:'E5',d:.5},{f:'G5',d:.5},{f:'E5',d:.5},{f:'A5',d:.5},{f:'G5',d:.5},{f:'E5',d:1},
+      {f:'G5',d:.5},{f:'F5',d:.5},{f:'E5',d:.5},{f:'D5',d:.5},{f:'C5',d:2},
+      {f:'G5',d:.5},{f:'G5',d:.5},{f:'A5',d:.5},{f:'G5',d:.5},{f:'F5',d:.5},{f:'E5',d:.5},{f:'D5',d:1},
+      {f:'F5',d:.5},{f:'F5',d:.5},{f:'G5',d:.5},{f:'F5',d:.5},{f:'E5',d:.5},{f:'D5',d:.5},{f:'C5',d:1},
+      {f:'E5',d:.5},{f:'D5',d:.5},{f:'C5',d:.5},{f:'B4',d:.5},{f:'A4',d:.5},{f:'G4',d:.5},{f:'A4',d:1},
+      {f:'G4',d:.5},{f:'A4',d:.5},{f:'B4',d:.5},{f:'C5',d:.5},{f:'G4',d:2},
+    ]},
+    {type:'triangle',vol:0.07,offset:.1,notes:[
+      {f:'C4',d:1},{f:'G4',d:1},{f:'E4',d:1},{f:'G4',d:1},{f:'F4',d:1},{f:'C4',d:1},{f:'G4',d:1},{f:'E4',d:1},
+      {f:'A4',d:1},{f:'E4',d:1},{f:'C4',d:1},{f:'E4',d:1},{f:'D4',d:1},{f:'G4',d:1},{f:'C4',d:2},
+      {f:'B4',d:1},{f:'G4',d:1},{f:'D4',d:1},{f:'G4',d:1},{f:'F4',d:1},{f:'C4',d:1},{f:'A4',d:1},{f:'E4',d:1},
+      {f:'G4',d:1},{f:'F4',d:1},{f:'E4',d:1},{f:'D4',d:1},{f:'C4',d:2},
+    ]},
+    {type:'sawtooth',vol:0.08,notes:[
+      {f:'C3',d:.5},{f:'R',d:.5},{f:'C3',d:.5},{f:'R',d:.5},{f:'G3',d:.5},{f:'R',d:.5},{f:'G3',d:.5},{f:'R',d:.5},
+      {f:'F3',d:.5},{f:'R',d:.5},{f:'F3',d:.5},{f:'R',d:.5},{f:'G3',d:.5},{f:'R',d:.5},{f:'G3',d:.5},{f:'R',d:.5},
+      {f:'A3',d:.5},{f:'R',d:.5},{f:'A3',d:.5},{f:'R',d:.5},{f:'F3',d:.5},{f:'R',d:.5},{f:'F3',d:.5},{f:'R',d:.5},
+      {f:'G3',d:.5},{f:'R',d:.5},{f:'C3',d:.5},{f:'R',d:.5},{f:'C3',d:1},{f:'R',d:1},
+      {f:'G3',d:.5},{f:'R',d:.5},{f:'G3',d:.5},{f:'R',d:.5},{f:'F3',d:.5},{f:'R',d:.5},{f:'F3',d:.5},{f:'R',d:.5},
+      {f:'C3',d:.5},{f:'R',d:.5},{f:'C3',d:.5},{f:'R',d:.5},{f:'G3',d:.5},{f:'R',d:.5},{f:'F3',d:.5},{f:'R',d:.5},
+      {f:'E3',d:.5},{f:'R',d:.5},{f:'D3',d:.5},{f:'R',d:.5},{f:'C3',d:.5},{f:'R',d:.5},{f:'G3',d:.5},{f:'R',d:.5},
+      {f:'F3',d:.5},{f:'R',d:.5},{f:'E3',d:.5},{f:'R',d:.5},{f:'C3',d:1},{f:'R',d:1},
+    ]},
+  ]},
+  2:{bpm:132,tracks:[
+    {type:'square',vol:0.13,notes:[
+      {f:'G5',d:.5},{f:'A5',d:.5},{f:'B5',d:1},{f:'A5',d:.5},{f:'G5',d:.5},{f:'Fs5',d:1},
+      {f:'G5',d:.5},{f:'B5',d:.5},{f:'D6',d:1},{f:'C6',d:.5},{f:'B5',d:.5},{f:'A5',d:1},
+      {f:'A5',d:.5},{f:'B5',d:.5},{f:'C6',d:1},{f:'B5',d:.5},{f:'A5',d:.5},{f:'G5',d:1},
+      {f:'A5',d:.5},{f:'G5',d:.5},{f:'Fs5',d:.5},{f:'E5',d:.5},{f:'D5',d:2},
+      {f:'D6',d:.5},{f:'C6',d:.5},{f:'B5',d:1},{f:'A5',d:.5},{f:'G5',d:.5},{f:'A5',d:1},
+      {f:'B5',d:.5},{f:'A5',d:.5},{f:'G5',d:.5},{f:'Fs5',d:.5},{f:'E5',d:2},
+      {f:'E5',d:.5},{f:'Fs5',d:.5},{f:'G5',d:1},{f:'A5',d:.5},{f:'B5',d:.5},{f:'C6',d:1},
+      {f:'B5',d:.5},{f:'A5',d:.5},{f:'G5',d:.5},{f:'Fs5',d:.5},{f:'G5',d:2},
+    ]},
+    {type:'triangle',vol:0.08,notes:[
+      {f:'D5',d:1},{f:'D5',d:1},{f:'G5',d:1},{f:'Fs5',d:1},{f:'E5',d:1},{f:'D5',d:1},{f:'A4',d:1},{f:'B4',d:1},
+      {f:'G5',d:1},{f:'Fs5',d:1},{f:'E5',d:1},{f:'A4',d:1},{f:'B4',d:1},{f:'C5',d:1},{f:'D5',d:1},{f:'G4',d:1},
+    ]},
+    {type:'sawtooth',vol:0.07,notes:[
+      {f:'G3',d:.5},{f:'R',d:.5},{f:'D3',d:.5},{f:'R',d:.5},{f:'G3',d:.5},{f:'R',d:.5},{f:'D3',d:.5},{f:'R',d:.5},
+      {f:'G3',d:.5},{f:'R',d:.5},{f:'D3',d:.5},{f:'R',d:.5},{f:'A3',d:.5},{f:'R',d:.5},{f:'E3',d:.5},{f:'R',d:.5},
+      {f:'C3',d:.5},{f:'R',d:.5},{f:'G3',d:.5},{f:'R',d:.5},{f:'D3',d:.5},{f:'R',d:.5},{f:'A3',d:.5},{f:'R',d:.5},
+      {f:'G3',d:.5},{f:'R',d:.5},{f:'D3',d:.5},{f:'R',d:.5},{f:'G3',d:1},{f:'R',d:1},
+      {f:'G3',d:.5},{f:'R',d:.5},{f:'D3',d:.5},{f:'R',d:.5},{f:'A3',d:.5},{f:'R',d:.5},{f:'E3',d:.5},{f:'R',d:.5},
+      {f:'C3',d:.5},{f:'R',d:.5},{f:'G3',d:.5},{f:'R',d:.5},{f:'D3',d:.5},{f:'R',d:.5},{f:'G3',d:.5},{f:'R',d:.5},
+      {f:'C3',d:.5},{f:'R',d:.5},{f:'G3',d:.5},{f:'R',d:.5},{f:'A3',d:.5},{f:'R',d:.5},{f:'D3',d:.5},{f:'R',d:.5},
+      {f:'G3',d:.5},{f:'R',d:.5},{f:'D3',d:.5},{f:'R',d:.5},{f:'G3',d:1},{f:'R',d:1},
+    ]},
+  ]},
+  3:{bpm:112,tracks:[
+    {type:'square',vol:0.11,notes:[
+      {f:'A5',d:1},{f:'G5',d:.5},{f:'E5',d:.5},{f:'C5',d:1},{f:'D5',d:.5},{f:'E5',d:.5},
+      {f:'F5',d:.5},{f:'E5',d:.5},{f:'D5',d:.5},{f:'C5',d:.5},{f:'E5',d:2},
+      {f:'G5',d:1},{f:'A5',d:.5},{f:'G5',d:.5},{f:'E5',d:1},{f:'F5',d:.5},{f:'G5',d:.5},
+      {f:'A5',d:.5},{f:'G5',d:.5},{f:'F5',d:.5},{f:'E5',d:.5},{f:'D5',d:2},
+      {f:'E5',d:.5},{f:'F5',d:.5},{f:'G5',d:.5},{f:'A5',d:.5},{f:'C6',d:1},{f:'B5',d:.5},{f:'A5',d:.5},
+      {f:'G5',d:.5},{f:'A5',d:.5},{f:'G5',d:.5},{f:'F5',d:.5},{f:'E5',d:2},
+      {f:'D5',d:.5},{f:'E5',d:.5},{f:'F5',d:.5},{f:'G5',d:.5},{f:'A5',d:1},{f:'G5',d:.5},{f:'F5',d:.5},
+      {f:'E5',d:.5},{f:'D5',d:.5},{f:'C5',d:.5},{f:'B4',d:.5},{f:'A4',d:2},
+    ]},
+    {type:'triangle',vol:0.06,notes:[
+      {f:'E5',d:1},{f:'C5',d:1},{f:'A4',d:1},{f:'C5',d:1},{f:'E5',d:1},{f:'F5',d:1},{f:'C5',d:1},{f:'B4',d:1},
+      {f:'C5',d:1},{f:'E5',d:1},{f:'G5',d:1},{f:'F5',d:1},{f:'E5',d:1},{f:'D5',d:1},{f:'C5',d:1},{f:'A4',d:1},
+    ]},
+    {type:'triangle',vol:0.055,notes:[
+      {f:'A3',d:.33},{f:'E4',d:.33},{f:'A4',d:.34},{f:'A3',d:.33},{f:'E4',d:.33},{f:'A4',d:.34},
+      {f:'C4',d:.33},{f:'G4',d:.33},{f:'C5',d:.34},{f:'C4',d:.33},{f:'G4',d:.33},{f:'C5',d:.34},
+      {f:'F3',d:.33},{f:'C4',d:.33},{f:'F4',d:.34},{f:'F3',d:.33},{f:'C4',d:.33},{f:'F4',d:.34},
+      {f:'E3',d:.33},{f:'B3',d:.33},{f:'E4',d:.34},{f:'E3',d:.33},{f:'B3',d:.33},{f:'E4',d:.34},
+      {f:'A3',d:.33},{f:'E4',d:.33},{f:'A4',d:.34},{f:'A3',d:.33},{f:'C4',d:.33},{f:'E4',d:.34},
+      {f:'D4',d:.33},{f:'A4',d:.33},{f:'D5',d:.34},{f:'D4',d:.33},{f:'F4',d:.33},{f:'A4',d:.34},
+      {f:'C4',d:.33},{f:'E4',d:.33},{f:'G4',d:.34},{f:'G3',d:.33},{f:'D4',d:.33},{f:'G4',d:.34},
+      {f:'F3',d:.33},{f:'C4',d:.33},{f:'F4',d:.34},{f:'A3',d:.33},{f:'E4',d:.33},{f:'A4',d:.34},
+    ]},
+  ]},
+  4:{bpm:126,tracks:[
+    {type:'square',vol:0.11,notes:[
+      {f:'D5',d:.5},{f:'E5',d:.5},{f:'Fs5',d:1},{f:'A5',d:.5},{f:'G5',d:.5},{f:'Fs5',d:1},
+      {f:'E5',d:.5},{f:'Fs5',d:.5},{f:'G5',d:1},{f:'A5',d:.5},{f:'G5',d:.5},{f:'Fs5',d:1},
+      {f:'D5',d:.5},{f:'E5',d:.5},{f:'Fs5',d:.5},{f:'G5',d:.5},{f:'A5',d:1},{f:'B5',d:1},
+      {f:'A5',d:.5},{f:'G5',d:.5},{f:'Fs5',d:.5},{f:'E5',d:.5},{f:'D5',d:2},
+      {f:'G5',d:.5},{f:'A5',d:.5},{f:'B5',d:1},{f:'A5',d:.5},{f:'G5',d:.5},{f:'Fs5',d:1},
+      {f:'E5',d:.5},{f:'D5',d:.5},{f:'E5',d:.5},{f:'Fs5',d:.5},{f:'G5',d:2},
+      {f:'Fs5',d:.5},{f:'E5',d:.5},{f:'D5',d:.5},{f:'E5',d:.5},{f:'Fs5',d:1},{f:'A5',d:1},
+      {f:'G5',d:.5},{f:'Fs5',d:.5},{f:'E5',d:.5},{f:'D5',d:.5},{f:'D5',d:2},
+    ]},
+    {type:'triangle',vol:0.07,notes:[
+      {f:'D5',d:1},{f:'A4',d:1},{f:'G4',d:1},{f:'Fs4',d:1},{f:'G4',d:1},{f:'D4',d:1},{f:'A4',d:1},{f:'D4',d:1},
+      {f:'G4',d:1},{f:'D4',d:1},{f:'A4',d:1},{f:'Fs4',d:1},{f:'G4',d:1},{f:'E4',d:1},{f:'D4',d:2},
+    ]},
+    {type:'sawtooth',vol:0.065,notes:[
+      {f:'D3',d:.5},{f:'R',d:.5},{f:'A3',d:.5},{f:'R',d:.5},{f:'D3',d:.5},{f:'R',d:.5},{f:'A3',d:.5},{f:'R',d:.5},
+      {f:'G3',d:.5},{f:'R',d:.5},{f:'D3',d:.5},{f:'R',d:.5},{f:'A3',d:.5},{f:'R',d:.5},{f:'D3',d:.5},{f:'R',d:.5},
+      {f:'D3',d:.5},{f:'R',d:.5},{f:'A3',d:.5},{f:'R',d:.5},{f:'G3',d:.5},{f:'R',d:.5},{f:'D3',d:.5},{f:'R',d:.5},
+      {f:'A3',d:.5},{f:'R',d:.5},{f:'D3',d:1},{f:'R',d:1.5},
+      {f:'G3',d:.5},{f:'R',d:.5},{f:'D3',d:.5},{f:'R',d:.5},{f:'A3',d:.5},{f:'R',d:.5},{f:'E3',d:.5},{f:'R',d:.5},
+      {f:'G3',d:.5},{f:'R',d:.5},{f:'D3',d:.5},{f:'R',d:.5},{f:'A3',d:1},{f:'R',d:1},
+      {f:'D3',d:.5},{f:'R',d:.5},{f:'A3',d:.5},{f:'R',d:.5},{f:'D3',d:.5},{f:'R',d:.5},{f:'Fs3',d:.5},{f:'R',d:.5},
+      {f:'G3',d:.5},{f:'R',d:.5},{f:'D3',d:.5},{f:'R',d:.5},{f:'D3',d:1},{f:'R',d:1},
+    ]},
+  ]},
+};
+let _bgmGain=null,_bgmTimer=null,_bgmPaused=false,_bgmChapter=0,_bgmVol=0.38,_muted=false;
+function getBgmGain(){
+  const ctx=getCtx();
+  if(!_bgmGain){_bgmGain=ctx.createGain();_bgmGain.gain.value=_muted?0:_bgmVol;_bgmGain.connect(ctx.destination);}
+  return _bgmGain;
+}
+function stopAllBgm(){if(_bgmTimer){clearTimeout(_bgmTimer);_bgmTimer=null;}}
+function scheduleSong(chapter){
+  const song=SONGS[chapter];if(!song)return;
+  const ctx=getCtx();const mg=getBgmGain();const beat=60/song.bpm;let loopDur=0;
+  song.tracks.forEach(track=>{
+    let t=ctx.currentTime+(track.offset||0);
+    track.notes.forEach(note=>{
+      const dur=note.d*beat;
+      if(note.f!=='R'&&N[note.f])playNote(N[note.f],track.type,t,dur*.88,track.vol,mg);
+      t+=dur;
+    });
+    const td=track.notes.reduce((s,n)=>s+n.d*beat,0);loopDur=Math.max(loopDur,td);
+  });
+  _bgmTimer=setTimeout(()=>{if(!_bgmPaused&&_bgmChapter===chapter)scheduleSong(chapter);},(loopDur-.1)*1000);
+}
+const ChoBGM={
+  play(ch){stopAllBgm();_bgmPaused=false;_bgmChapter=ch;if(_ctx&&_ctx.state==='suspended')_ctx.resume();scheduleSong(ch);},
+  stop(){stopAllBgm();_bgmChapter=0;_bgmPaused=false;},
+  pause(){if(_bgmPaused)return;_bgmPaused=true;stopAllBgm();},
+  resume(){if(!_bgmPaused||!_bgmChapter)return;_bgmPaused=false;scheduleSong(_bgmChapter);},
+  setVolume(v){_bgmVol=Math.max(0,Math.min(1,v));if(_bgmGain)_bgmGain.gain.value=_muted?0:_bgmVol;},
+  get chapter(){return _bgmChapter;}
+};
+let _sfxGain=null,_sfxVol=0.55;
+function getSfxGain(){
+  const ctx=getCtx();
+  if(!_sfxGain){_sfxGain=ctx.createGain();_sfxGain.gain.value=_muted?0:_sfxVol;_sfxGain.connect(ctx.destination);}
+  return _sfxGain;
+}
+function playSfxSeq(seq){
+  const ctx=getCtx();const g=getSfxGain();let t=ctx.currentTime;
+  seq.forEach(([freq,type,dur,vol])=>{if(freq>0)playNote(freq,type,t,dur,vol,g);t+=dur;});
+}
+const ChoSFX={
+  jump(){playSfxSeq([[N.C5,'square',.055,.22],[N.E5,'square',.055,.20],[N.G5,'square',.055,.18],[N.C6,'square',.08,.16]]);},
+  npc(){playSfxSeq([[N.G5,'triangle',.07,.20],[N.C6,'triangle',.07,.20],[N.E6,'triangle',.12,.22]]);},
+  hit(){playSfxSeq([[N.A4,'sawtooth',.05,.20],[N.Gs4,'sawtooth',.05,.18],[N.Fs4,'sawtooth',.05,.16],[N.E4,'sawtooth',.12,.18]]);},
+  item(){playSfxSeq([[N.E5,'triangle',.06,.18],[N.G5,'triangle',.06,.18],[N.C6,'triangle',.06,.18],[N.E6,'triangle',.10,.20]]);},
+  setVolume(v){_sfxVol=Math.max(0,Math.min(1,v));if(_sfxGain)_sfxGain.gain.value=_muted?0:_sfxVol;},
+  win(){playSfxSeq([[N.C5,'square',.07,.20],[N.E5,'square',.07,.20],[N.G5,'square',.07,.20],[N.C6,'square',.18,.28],[N.E6,'square',.22,.24]]);},
+  fail(){playSfxSeq([[N.G4,'sawtooth',.10,.18],[N.E4,'sawtooth',.10,.16],[N.C4,'sawtooth',.10,.15],[N.A3,'sawtooth',.22,.18]]);}
+};
+const ChoAudio={
+  toggleMute(){_muted=!_muted;if(_bgmGain)_bgmGain.gain.value=_muted?0:_bgmVol;if(_sfxGain)_sfxGain.gain.value=_muted?0:_sfxVol;return _muted;},
+  get muted(){return _muted;}
+};
+window.ChoBGM=ChoBGM;window.ChoSFX=ChoSFX;window.ChoAudio=ChoAudio;
+})();
+
+</script>
+</head>
+<body>
+<div id="wrap">
+  <canvas id="c" width="800" height="416"></canvas>
+</div>
+<div id="ov"><div class="pnl" id="pnl"></div></div>
+<script>
+// ═══════════════════════════════════════════════
+//  조백호의 여행 - 2장: 시내 탐험
+// ═══════════════════════════════════════════════
+const CV=document.getElementById('c'),cx=CV.getContext('2d');
+cx.imageSmoothingEnabled=false;
+const OV=document.getElementById('ov'),PNL=document.getElementById('pnl');
+const W=800,H=416,FL=370,PS=3,WORLD=5800;
+let GS=1;
+function updateGS(){GS=CV.getBoundingClientRect().width/W||1;updateButtonRects();}
+window.addEventListener('resize',updateGS);
+setTimeout(updateGS,0);
+
+// ── PALETTE ──────────────────────────────────────
+const PAL={
+  '.':null,
+  'W':'#FFFFFF','w':'#F2F0E8','L':'#D0D0C0',
+  'B':'#000000','b':'#222222',
+  'P':'#FFB8C8','p':'#E07090',
+  // dog
+  'H':'#F2C06A','h':'#C89040',
+  'X':'#1A1A18','x':'#8B5A28','J':'#AAAAAA',
+  // city palette
+  'C':'#607080','c':'#485868',  // building gray
+  'T':'#3A4858','t':'#283848',  // dark building
+  'K':'#C8A870','k':'#A88850',  // road/sidewalk
+  'Z':'#484848','z':'#303030',  // road dark
+  'Y':'#FFD020','y':'#CC9900',  // yellow
+  'E':'#FF4444','e':'#CC2222',  // red
+  'G':'#44CC44','g':'#229922',  // green
+  'D':'#2288FF','d':'#1166CC',  // blue
+  'N':'#888888','n':'#666666',  // manhole
+  // manhole
+  '0':'#555555','9':'#333333','8':'#777777',
+  // people
+  'R':'#D84068','r':'#A02050',
+  'A':'#2850A0','a':'#1A3878',
+  'M':'#E8C020','m':'#B09000',
+  'F':'#389840','f':'#207028',
+  // cafe/items
+  'O':'#FF7820','o':'#CC5010',
+  'S':'#E8B840','s':'#C09020',
+  'V':'#9C6FD0','v':'#7B4EB0',  // purple (life potion)
+  'I':'#44BBFF','i':'#2299DD',  // ice blue
+  // taxi
+  'Q':'#FFD700','q':'#CC9900',
+};
+function spr(data,sx,sy,flip=false){
+  const cols=data[0].length;
+  data.forEach((row,ry)=>[...row].forEach((c,rx)=>{
+    if(!PAL[c])return;
+    const dx=flip?sx+(cols-1-rx)*PS:sx+rx*PS;
+    cx.fillStyle=PAL[c];cx.fillRect(dx,sy+ry*PS,PS,PS);
+  }));
+}
+function fillR(x,y,w,h,col){cx.fillStyle=col;cx.fillRect(x,y,w,h);}
+
+// ── SPRITES ──────────────────────────────────────
+const D_RUN1=['..PPWWWWPP..','.WWWWWWWWWWW','WWWWWWWWWWWW','W.BB.WW.BB.W','WWWWWWWWWWWW','WWWWLLLLWWWW','WWWWLBBLwwww','WWWWWWWWWWWW','.WWWWWWWWWWW','.WWWWWWWWWWW','.WWWWWWWWWWW','..WWWWWWWWWW','..WW.WW.WW..','..WW.WW.WW..'];
+const D_RUN2=['..PPWWWWPP..','.WWWWWWWWWWW','WWWWWWWWWWWW','W.BB.WW.BB.W','WWWWWWWWWWWW','WWWWLLLLWWWW','WWWWLBBLwwww','WWWWWWWWWWWW','.WWWWWWWWWWW','.WWWWWWWWWWW','.WWWWWWWWWWW','..WWWWWWWWWW','...WW.WW.WW.','...WW.WW.WW.'];
+const D_JMP=['..PPWWWWPP..','.WWWWWWWWWWW','WWWWWWWWWWWW','W.BB.WW.BB.W','WWWWWWWWWWWW','WWWWLLLLWWWW','WWWWLBBLwwww','WWWWWWWWWWWW','.WWWWWWWWWWW','..WWWWWWWWWW','..WWWWWWWWWW','.WW.WWWWWWWW','WW....WWWWWW','............'];
+
+// 맨홀 (10x6)
+const MANHOLE=['..00000000..','0088888880..','08NN9N9N980.','08N9NNNNN80.','0088888880..','..00000000..'];
+
+// 치와와 친구 (따라다니는 소형)
+const CHIWA_F=['..@@@..','.$$$$.','$#BB#$','.$$$$.','.@.@..','........'];
+const CHIWA_PAL={'@':'#D4A058','#':'#A07030','$':'#EEC880','B':'#1E1E18','W':'#FFFFFF','.':null};
+
+// 퍼그(복이) 소형 스프라이트
+const PUG_F=['.HHHH.','H#BB#H','.hHHh.','.H..H.','.H..H.'];
+const PUG_PAL={'H':'#C8A060','h':'#A07840','#':'#555','B':'#000000','.':null};
+
+// 푸들(솜이) 소형 스프라이트
+const POODLE_F=['.WWWW.','W.BB.W','.WWWW.','.L..L.','.L..L.'];
+const POODLE_PAL={'W':'#F0F0F0','L':'#E0E0E0','B':'#1E1E18','V':'#FF82A0','.':null};
+
+const DOG_F_SPRITES={'chiwa':CHIWA_F,'pug':PUG_F,'poodle':POODLE_F};
+const DOG_F_PALS={'chiwa':CHIWA_PAL,'pug':PUG_PAL,'poodle':POODLE_PAL};
+
+function sprC(data,sx,sy,pal){
+  const p=pal||CHIWA_PAL;
+  const cols=data[0].length;
+  data.forEach((row,ry)=>[...row].forEach((c,rx)=>{
+    if(!p[c])return;
+    cx.fillStyle=p[c];cx.fillRect(sx+rx*PS,sy+ry*PS,PS,PS);
+  }));
+}
+
+// 사람 4종
+const P_CONV=['..HHHH..','.HHxHHH.','..HHHH..','..H.H...','.FFFFFF.','FFFFFFFF','FFwwwwFF','.FFFFFF.','.FF.FF..','.FF.FF..','..F..F..','..F..F..','..KK.KK.','..KK.KK.'];
+const P_CAFE=['..HHHH..','.HHxHHH.','..HHHH..','..H.H...','.AAAAAA.','AAAWWWAA','AAAwwwAA','.AAAAAA.','.AA.AA..','.AA.AA..','..A..A..','..A..A..','..KK.KK.','..KK.KK.'];
+const P_VEND=['..JJJJ..','.HJJjJH.','..HHHH..','..H.H...','.RRRRRR.','RRRRRRRR','RRwwwwRR','.RRRRRR.','.RR.RR..','.RR.RR..','..R..R..','..R..R..','..KK.KK.','..KK.KK.'];
+const P_KID=['..HHHH..','.HHxHHH.','..HHHH..','..H.H...','.MMMMMM.','MMMMMMMM','.MMMMMM.','.MM.MM..','.MM.MM..','..KK.KK.','..KK.KK.'];
+const PERSON_SP=[P_CONV,P_CAFE,P_VEND,P_KID];
+const PERSON_H={0:42,1:42,2:42,3:33};
+const PERSON_MSG=['핫도그 드세요~','붕어빵 있어요!','간식 드릴게요!','여기요!'];
+
+// 택시 (16x8)
+const TAXI_SPR=[
+  '....QQQQQQ......',
+  '...QddddddQ.....',
+  '..QQddddddQQ....',
+  '.QQQQQQQQQQQQq..',
+  'QQQQQQQQQQQQQQq.',
+  'QQQQQQQQQQQQQQq.',
+  'Qq.QQQQQQQQ.qQq.',
+  '...ZZZ....ZZZ...',
+];
+const TAXI_PAL={'Q':'#FFD700','q':'#AA7700','d':'#AADDFF','Z':'#222222','W':'#FFFFFF','.':null};
+function sprTaxi(sx,sy){
+  TAXI_SPR.forEach((row,ry)=>[...row].forEach((c,rx)=>{
+    if(!TAXI_PAL[c])return;
+    cx.fillStyle=TAXI_PAL[c];cx.fillRect(sx+rx*PS,sy+ry*PS,PS,PS);
+  }));
+}
+
+// ── STATE ────────────────────────────────────────
+let gs='title',frame=0,cam=0,hearts=5,maxHearts=5,score=0;
+let manholes=[],snacks=[],cars=[],treePositions=[],buildings={far:[],mid:[]};
+let popups=[],petals=[];
+let hasBag=false,invOpen=false;
+let inventory={lifePotion:0,shield:0,items:[],catAbility:false,birdAbility:false};
+let hasInvincible=false,invincibleTimer=0;
+let manholeSlowTimer=0;
+let chiwaFromCh1=false,ch1CatAb=false,ch1BirdAb=false,ch1DogType='chiwa'; // 1장 데이터
+
+// NPC들
+let parkNPC=null,crossNPC=null,cafeNPC=null,dollyNPC=null,taxiScene=null;
+let houseNPCs=[],houseMissionDone=false;
+
+// 치와와 친구
+let chiwaFriend={active:false,x:0,wf:0,wt:0};
+
+const PL={
+  x:120,y:FL-42,vy:0,vx:0,w:36,h:42,
+  ground:false,wf:0,wt:0,inv:0,
+  dj:false,suit:'none'
+};
+const JUMP_V=-10.0,GRAV=0.52,SPD=4.2;
+
+// ── INIT ─────────────────────────────────────────
+function initGame(){
+  // 1장 데이터 불러오기
+  let ch1={};
+  try{ch1=JSON.parse(localStorage.getItem('ch1_save')||'{}');}catch(e){}
+  chiwaFromCh1=!!ch1.hadChiwa;
+  ch1CatAb=!!ch1.catAbility;
+  ch1BirdAb=!!ch1.birdAbility;
+  ch1DogType=ch1.dogType||'chiwa';
+  hasBag=true;  // 2장은 기본 지급
+  // 1장 인벤토리 아이템 이어받기
+  const ch1CatEq=!!ch1.catEquipped;
+  const ch1BirdEq=!!ch1.birdEquipped;
+  inventory={lifePotion:0,shield:0,items:[],
+    catAbility:ch1CatAb&&!ch1CatEq,   // 인벤에 있는 것만
+    birdAbility:ch1BirdAb&&!ch1BirdEq};
+  if(ch1.items&&Array.isArray(ch1.items))inventory.items=[...ch1.items];
+
+  Object.assign(PL,{x:120,y:FL-42,vy:0,vx:0,ground:false,wf:0,wt:0,inv:0,dj:false,catAb:ch1CatEq||false,birdAb:ch1BirdEq||false,birdBoosts:(ch1BirdEq?4:0),suit:(ch1CatEq?'cat':(ch1BirdEq?'bird':'none'))});
+  hearts=5;maxHearts=5;score=0;cam=0;frame=0;
+  popups=[];invOpen=false;
+  // hasBag은 ch1 데이터에서 로드
+  hasInvincible=false;invincibleTimer=0;manholeSlowTimer=0;
+  chiwaFriend={active:chiwaFromCh1,x:chiwaFromCh1?120-60:0,wf:0,wt:0};
+
+  // 맨홀 랜덤 배치
+  manholes=[];let mx=420;
+  while(mx<WORLD-600){
+    mx+=200+Math.floor(Math.random()*290);
+    manholes.push({x:mx,used:false});
+    if(Math.random()<0.3){manholes.push({x:mx+70+Math.floor(Math.random()*40),used:false});mx+=100;}
+  }
+
+  // 간식 사람 (4명)
+  snacks=[700,1600,2800,3900].map((b,i)=>({
+    x:b+Math.floor(Math.random()*200-80),
+    type:i%4,used:false
+  }));
+
+  // NPC 위치
+  parkNPC=null;
+  crossNPC={x:2100,met:false};
+  cafeNPC={x:3300,met:false};
+  // 강아지 집 미션 (chiwaFromCh1이면 3집 배치)
+  if(chiwaFromCh1){
+    const dogs=['chiwa','pug','poodle'];
+    const shuffled=[...dogs].sort(()=>Math.random()-.5);
+    // 3집: x=1200, 2800, 4400 (띄엄띄엄)
+    houseNPCs=[
+      {x:1200,dogType:shuffled[0],met:false,found:false},
+      {x:2800,dogType:shuffled[1],met:false,found:false},
+      {x:4400,dogType:shuffled[2],met:false,found:false},
+    ];
+    houseMissionDone=false;
+  } else {
+    houseNPCs=[];houseMissionDone=true;
+  }
+  dollyNPC=null;  // 기존 단일 NPC 비활성화
+  taxiScene={x:WORLD-400,active:false,done:false,taxiX:WORLD+200,taxiDir:-1};
+
+  // 빌딩 위치 미리 생성 (worldX 기준 고정)
+  buildings.far=[];buildings.mid=[];
+  for(let rep=0;rep<4;rep++){
+    [0,90,182,264,360,456,540,630,720].forEach((bx,i)=>{
+      const wx=bx+rep*850;
+      const bh=[88,98,84,92,102,88,96,88,98][i];
+      const bw=[72,80,68,76,82,70,78,72,80][i];
+      buildings.far.push({wx,bw,bh,style:i%7});
+    });
+    [0,114,228,330,448,562,680,795].forEach((bx,i)=>{
+      const wx=bx+rep*950;
+      const bh=[112,122,108,118,128,110,120,112][i];
+      const bw=[90,100,84,95,106,88,98,90][i];
+      buildings.mid.push({wx,bw,bh,style:(i+1)%7});
+    });
+  }
+
+  // 가로수 랜덤 위치 생성
+  treePositions=[];let tp=200;
+  while(tp<WORLD-200){
+    tp+=150+Math.floor(Math.random()*250);
+    treePositions.push({x:tp,v:Math.floor(Math.random()*3)});
+  }
+
+  // 배경 장식
+  petals=Array.from({length:6},()=>({
+    x:Math.random()*W,y:Math.random()*H*.5,
+    vx:-0.3-Math.random()*.4,vy:.2+Math.random()*.3,
+    wb:Math.random()*Math.PI*2,c:'#888'
+  }));
+}
+
+// ── INPUT ────────────────────────────────────────
+function updateButtonRects(){}  // GS 변경 시 훅 (버튼은 캔버스 내부 좌표)
+const keys={};
+const mobileKeys={left:false,right:false,jump:false};
+let pauseBtnRect={x:W-60,y:6,w:52,h:36};
+const MB={
+  left:{x:14,y:H-80,w:64,h:60},
+  right:{x:84,y:H-80,w:64,h:60},
+  jump:{x:W-100,y:H-86,w:88,h:72},
+};
+function inBtn(btn,tx,ty){return tx>=btn.x&&tx<=btn.x+btn.w&&ty>=btn.y&&ty<=btn.y+btn.h;}
+
+document.addEventListener('keydown',e=>{
+  keys[e.code]=true;
+  ['Space','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.code)&&e.preventDefault();
+  if(gs==='title'&&(e.code==='Space'||e.code==='Enter'))showTutorial();
+  else if(gs==='howto'&&(e.code==='Space'||e.code==='Enter'))nextTut();
+  else if(gs==='playing'){
+    if(e.code==='Space'||e.code==='ArrowUp')doJump();
+    if(e.code==='KeyP')togglePause();
+    if(e.code==='KeyB')toggleInv();
+  }
+  else if(gs==='paused'&&e.code==='KeyP')togglePause();
+  else if(gs==='inv'&&e.code==='KeyB')toggleInv();
+  else if(gs==='cross_game'&&e.code==='Space')doCrossHit();
+});
+document.addEventListener('keyup',e=>{keys[e.code]=false;});
+
+CV.addEventListener('click',e=>{
+  const r=CV.getBoundingClientRect();
+  const tx=(e.clientX-r.left)*(W/r.width);
+  const ty=(e.clientY-r.top)*(H/r.height);
+  if(tx>=W-72&&tx<=W-28&&ty>=46&&ty<=66){ChoAudio.toggleMute();return;}
+  if(gs==='title'){showTutorial();return;}
+  if(gs==='howto'){nextTut();return;}
+  if(gs==='playing'){
+    if(inBtn(pauseBtnRect,tx,ty)){togglePause();return;}
+    if(tx>W*.35)doJump();
+  }
+  if(gs==='cross_game')doCrossHit();
+});
+CV.addEventListener('touchstart',e=>{
+  // 오버레이 패널이 열려있으면 캔버스 터치 무시 (버튼 탭 허용)
+  if(OV.style.display==='flex')return;
+  e.preventDefault();
+  const r=CV.getBoundingClientRect();
+  const t0=e.changedTouches[0];
+  const tx=(t0.clientX-r.left)*(W/r.width);
+  const ty=(t0.clientY-r.top)*(H/r.height);
+  if(gs==='title'){showTutorial();return;}
+  if(gs==='howto'){nextTut();return;}
+  if(gs==='cross_game'){doCrossHit();return;}
+  if(gs==='playing'){
+    if(inBtn(pauseBtnRect,tx,ty)){togglePause();return;}
+    updateMobileKeys(e);
+  }
+},{passive:false});
+CV.addEventListener('touchmove',e=>{if(OV.style.display==='flex')return;e.preventDefault();if(gs==='playing')updateMobileKeys(e);},{passive:false});
+CV.addEventListener('touchend',e=>{
+  e.preventDefault();
+  if(gs==='playing'){
+    const pts=getTouches(e);
+    mobileKeys.left=pts.some(p=>inBtn(MB.left,p.x,p.y));
+    mobileKeys.right=pts.some(p=>inBtn(MB.right,p.x,p.y));
+    mobileKeys.jump=pts.some(p=>inBtn(MB.jump,p.x,p.y));
+  }
+},{passive:false});
+function getTouches(e){
+  const r=CV.getBoundingClientRect();
+  return Array.from(e.touches).map(t=>({x:(t.clientX-r.left)*(W/r.width),y:(t.clientY-r.top)*(H/r.height)}));
+}
+function updateMobileKeys(e){
+  const pts=getTouches(e);
+  mobileKeys.left=pts.some(p=>inBtn(MB.left,p.x,p.y));
+  mobileKeys.right=pts.some(p=>inBtn(MB.right,p.x,p.y));
+  const jn=pts.some(p=>inBtn(MB.jump,p.x,p.y));
+  if(jn&&!mobileKeys.jump)doJump();
+  mobileKeys.jump=jn;
+}
+
+function doJump(){
+  if(PL.ground){PL.vy=JUMP_V;PL.ground=false;PL.dj=false;PL.birdBoosts=PL.birdAb?4:0;ChoSFX.jump();}
+  else if(PL.birdAb&&PL.birdBoosts>0){PL.vy=Math.max(-13,PL.vy-3.5);PL.birdBoosts--;ChoSFX.jump();}
+  else if(!PL.dj&&PL.catAb){PL.vy=JUMP_V*.78;PL.dj=true;ChoSFX.jump();}
+}
+function startGame(){initGame();gs='playing';OV.style.display='none';ChoBGM.play(2);}
+function togglePause(){
+  if(gs==='playing'){gs='paused';OV.style.display='flex';showPausePanel();ChoBGM.pause();}
+  else if(gs==='paused'){gs='playing';OV.style.display='none';ChoBGM.resume();}
+}
+function toggleInv(){
+  if(!hasBag)return;
+  if(!invOpen){
+    invOpen=true;
+    if(gs==='playing'){gs='inv';showInvPanel();}
+  } else {
+    invOpen=false;
+    if(gs==='inv'){gs='playing';OV.style.display='none';}
+  }
+}
+// ── 2장 인벤토리 (1장과 동일한 4x6 그리드)
+const INV_CATALOG2={
+  catAbility:{icon:'😸',name:'고양이 능력',desc:'이중 점프 가능!',color:'#ff8a65'},
+  birdAbility:{icon:'🐦',name:'새 능력',desc:'날기! 스페이스 연타로 더 높이!',color:'#42a5f5'},
+  lifePotion:{icon:'🧪',name:'생명수',desc:'하트를 가득 채워요!',color:'#69f0ae'},
+  shield:{icon:'🛡️',name:'무적 방패',desc:'3초간 무적 상태!',color:'#ffd700'},
+};
+function getInvSlots2(){
+  const slots=[];
+  if(inventory.catAbility)slots.push({key:'catAbility',...INV_CATALOG2.catAbility});
+  if(inventory.birdAbility)slots.push({key:'birdAbility',...INV_CATALOG2.birdAbility});
+  for(let i=0;i<inventory.lifePotion;i++)slots.push({key:'lifePotion_'+i,...INV_CATALOG2.lifePotion});
+  for(let i=0;i<inventory.shield;i++)slots.push({key:'shield_'+i,...INV_CATALOG2.shield});
+  inventory.items.forEach((it,i)=>slots.push({key:'item_'+i,icon:'📦',name:it,desc:'',color:'#aaa'}));
+  return slots;
+}
+function showInvPanel(selKey){
+  OV.style.display='flex';
+  renderInvGrid2(selKey);
+}
+function renderInvGrid2(selectedKey){
+  const slots=getInvSlots2();
+  const TOTAL=24;
+  let cells='';
+  for(let i=0;i<TOTAL;i++){
+    const s=slots[i];
+    const sel=s&&s.key===selectedKey;
+    const bc=sel?'#ffd700':(s?'#555':'#222');
+    const bg=s?'#1a1a40':'#0a0a18';
+    const ic=s?s.icon:'';
+    const oc=s?(' onclick="_selKey2=\''+s.key+'\';renderInvGrid2(_selKey2)"'):'';    
+    cells+='<div'+oc+' style="aspect-ratio:1;background:'+bg+';border:2px solid '+bc+
+      ';border-radius:6px;display:flex;align-items:center;justify-content:center;'+
+      'font-size:calc(min(6vw,28px));cursor:'+(s?'pointer':'default')+';'+
+      (sel?'box-shadow:0 0 8px rgba(255,215,0,0.5);':'')+
+      '">'+ic+'</div>';
+  }
+  const sel=selectedKey?slots.find(function(s){return s&&s.key===selectedKey;}):null;
+  let detail='<div class="mg-sub" style="margin-top:20px;text-align:center">←<br>아이템 선택</div>';
+  if(sel){
+    detail='<div style="text-align:center;margin-bottom:8px;font-size:clamp(28px,5vw,40px)">'+sel.icon+'</div>'
+      +'<b class="mg-hi" style="color:'+sel.color+';display:block;margin-bottom:6px">'+sel.name+'</b>'
+      +'<p class="mg-sub" style="margin-bottom:12px;line-height:1.5">'+sel.desc+'</p>'
+      +'<button class="btn g" style="width:100%" onclick="useInvItem2(_selKey2)">▶ 사용하기</button>';
+  }
+  PNL.innerHTML='<div style="display:flex;gap:12px;align-items:flex-start">'
+    +'<div style="flex-shrink:0">'
+    +'<div class="mg-sub" style="margin-bottom:6px;text-align:center">🎒 인벤토리</div>'
+    +'<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:5px;width:min(44vw,260px)">'
+    +cells+'</div></div>'
+    +'<div style="flex:1;min-width:0;padding-top:20px">'+detail+'</div>'
+    +'</div>'
+    +'<button class="btn" style="margin-top:10px;display:block;width:100%" onclick="toggleInv()">닫기 (B)</button>';
+}
+let _selKey2='';window.selectInvItem2=function(key){_selKey2=key;renderInvGrid2(key);};
+window.useInvItem2=function(key){
+  if(key==='catAbility'){
+    if(!inventory.catAbility)return;
+    PL.catAb=true;inventory.catAbility=false;
+    popups.push({x:PL.x,y:PL.y,t:'😸 이중점프 장착!',c:'#ff8a65',life:70});
+    toggleInv();
+  } else if(key==='birdAbility'){
+    if(!inventory.birdAbility)return;
+    PL.birdAb=true;PL.birdBoosts=4;inventory.birdAbility=false;
+    popups.push({x:PL.x,y:PL.y,t:'🐦 날기 장착!',c:'#42a5f5',life:70});
+    toggleInv();
+  } else if(key.startsWith('lifePotion')){
+    if(inventory.lifePotion<=0)return;
+    inventory.lifePotion--;hearts=maxHearts;
+    popups.push({x:PL.x,y:PL.y,t:'💚 하트 가득!',c:'#69f0ae',life:70});
+    showInvPanel();
+  } else if(key.startsWith('shield')){
+    if(inventory.shield<=0)return;
+    inventory.shield--;hasInvincible=true;invincibleTimer=180;
+    popups.push({x:PL.x,y:PL.y,t:'🛡️ 무적!',c:'#ffd700',life:70});
+    showInvPanel();
+  }
+};
+window.resumePlay=()=>{OV.style.display='none';gs='playing';PL.inv=Math.max(PL.inv,180);ChoBGM.resume();};
+window.skipPuzzle=()=>{OV.style.display='none';gs='playing';};
+window.goToChapter3=()=>{window.location.href='chapter3.html';};
+
+// ── TUTORIAL ─────────────────────────────────────
+const TUT_PAGES=[
+  {title:'🎮 2장: 시내 탐험',content:`
+    <div class="tut-row"><span class="tut-icon">🏙️</span><span class="tut-text">드디어 시내로 나왔어요!<br>빌딩, 신호등, 카페가 기다려요.</span></div>
+    <div class="tut-row"><span class="tut-icon">🎮</span><span class="tut-text">이동: ← → 화살표 / A,D<br>점프: ↑ / 스페이스 / 화면 오른쪽 탭</span></div>
+    <div class="tut-row"><span class="tut-icon">🎒</span><span class="tut-text">인벤토리: B 키 (가방 획득 후 사용)</span></div>
+    <div class="tut-row"><span class="tut-icon">⏸</span><span class="tut-text">일시정지: P 키 또는 화면 우상단</span></div>
+  `},
+  {title:'💔 위험 & ❤️ 아이템',content:`
+    <div class="tut-row"><span class="tut-icon">🕳️</span><span class="tut-text">맨홀 밟으면 하트 -1 + 잠깐 느려짐!<br>조심해서 점프로 피하세요!</span></div>
+    <div class="tut-row"><span class="tut-icon">🍖</span><span class="tut-text">시내 사람들한테 간식 받으면 하트 +1</span></div>
+    <div class="tut-row"><span class="tut-icon">🧪</span><span class="tut-text">생명수: 인벤토리에서 사용하면 하트 가득!</span></div>
+  `},
+  {title:'🎯 미니게임 & 미션',content:`
+    <div class="tut-row"><span class="tut-icon">🚦</span><span class="tut-text"><b style="color:#ff5252">횡단보도</b>: 신호등 건너기<br>→ 일시적 무적!</span></div>
+    <div class="tut-row"><span class="tut-icon">☕</span><span class="tut-text"><b style="color:#E8B840">카페</b>: 멍푸치노 만들기<br>→ 최대 체력 5 → 7!</span></div>
+    <div class="tut-row"><span class="tut-icon">🚕</span><span class="tut-text"><b style="color:#ffd700">마지막</b>: 택시 잡기 → 3장으로!</span></div>
+  `},
+];
+let tutPage=0;
+function showTutorial(){gs='howto';tutPage=0;OV.style.display='flex';renderTut();}
+function renderTut(){
+  const p=TUT_PAGES[tutPage];
+  const isLast=tutPage===TUT_PAGES.length-1;
+  PNL.innerHTML=`<h2>${p.title}</h2><div style="margin:8px 0">${p.content}</div>
+    <p class="mg-sub" style="margin-top:6px">${tutPage+1}/${TUT_PAGES.length}</p>
+    ${tutPage>0?`<button class="btn b" onclick="prevTut()">◀ 이전</button>`:''}
+    ${isLast?`<button class="btn g" onclick="startGame()">출발! 🐾</button>`:`<button class="btn g" onclick="nextTut()">다음 ▶</button>`}`;
+}
+function nextTut(){if(tutPage<TUT_PAGES.length-1){tutPage++;renderTut();}}
+window.nextTut=nextTut;
+window.prevTut=()=>{if(tutPage>0){tutPage--;renderTut();}};
+function showPausePanel(){
+  PNL.innerHTML=`<h2>⏸ 일시정지</h2>
+    <p>점수: <b style="color:#ffd700">${score}</b><br>하트: ${Array.from({length:Math.floor(hearts)},()=>'❤️').join('')}${hearts%1?'🩷':''} / ${maxHearts}</p>
+    ${hasBag?`<p style="color:#69f0ae">🎒 가방 보유 | 생명수: ${inventory.lifePotion}개</p>`:''}
+    <div class="btn-row"><button class="btn g" onclick="resumePlay()">계속 ▶</button>
+    <button class="btn r" onclick="initGame();startGame()">처음부터</button></div>`;
+}
+function showPanel(t){
+  OV.style.display='flex';ChoBGM.stop();
+  if(t==='over')
+    PNL.innerHTML=`<h2>💔 게임 오버</h2><p>아이고... 조백호가 쓰러졌어요.<br>점수: <b style="color:#ffd700">${score}</b></p>
+      <div class="btn-row"><button class="btn g" onclick="showLeaderboard()">점수 기록 🏆</button>
+      <button class="btn" onclick="initGame();startGame()">다시 도전!</button></div>`;
+  else if(t==='clear')
+    PNL.innerHTML=`<h2>🎉 2장 클리어!</h2>
+      <p>시내 탐험을 마쳤어요!<br>택시를 타고 3장 산으로 떠나요~ 🚕<br>
+      최종 점수: <b style="color:#ffd700">${score}</b></p>
+      <div class="btn-row"><button class="btn g" onclick="showLeaderboard()">점수 기록 🏆</button>
+      <button class="btn b" onclick="goToChapter3()">3장으로! →</button>
+      <button class="btn" onclick="initGame();startGame()">처음부터!</button></div>`;
+}
+
+// ── UPDATE ───────────────────────────────────────
+function update(){
+  if(gs!=='playing')return;
+
+  // 이동
+  const curMax=manholeSlowTimer>0?SPD*0.4:SPD;
+  const curMin=manholeSlowTimer>0?0.3:1.2;
+  if(keys['ArrowLeft']||keys['KeyA']||mobileKeys.left)PL.vx=Math.max(PL.vx-.7,-curMax*.45);
+  else if(keys['ArrowRight']||keys['KeyD']||mobileKeys.right)PL.vx=Math.min(PL.vx+.9,curMax);
+  else PL.vx*=.74;
+  if(PL.vx>curMax)PL.vx=curMax;
+  if(PL.vx<curMin)PL.vx=curMin;
+
+  PL.vy+=GRAV;PL.x+=PL.vx;PL.y+=PL.vy;
+  const fy=FL-PL.h;
+  if(PL.y>=fy){PL.y=fy;PL.vy=0;PL.ground=true;PL.dj=false;}
+  else PL.ground=false;
+  if(PL.y<8)PL.y=8;
+  cam=Math.max(0,Math.min(PL.x-W*.32,WORLD-W));
+  PL.x=Math.max(cam+40,PL.x);
+
+  if(PL.ground&&Math.abs(PL.vx)>.5){PL.wt++;if(PL.wt>6){PL.wt=0;PL.wf=(PL.wf+1)%4;}}
+  if(PL.inv>0)PL.inv--;
+  if(manholeSlowTimer>0)manholeSlowTimer--;
+  if(invincibleTimer>0){invincibleTimer--;if(invincibleTimer===0)hasInvincible=false;}
+
+  // 치와와 따라오기
+  if(chiwaFriend.active){
+    const tx=PL.x-60;
+    chiwaFriend.x+=(tx-chiwaFriend.x)*.14;
+    chiwaFriend.wt++;if(chiwaFriend.wt>7){chiwaFriend.wt=0;chiwaFriend.wf=(chiwaFriend.wf+1)%4;}
+  }
+
+  // 맨홀 충돌
+  if(PL.inv===0&&!hasInvincible){
+    for(const m of manholes){
+      if(m.used)continue;
+      const sx=m.x-cam;
+      if(PL.x-cam+PL.w-8>sx+2&&PL.x-cam+8<sx+26&&PL.y+PL.h>FL-16){
+        m.used=true;hearts=Math.max(0,hearts-1);PL.inv=80;ChoSFX.hit();
+        manholeSlowTimer=60;
+        // 장착 능력 해제
+        if(PL.catAb||PL.birdAb){
+          PL.catAb=false;PL.birdAb=false;PL.suit='none';
+          popups.push({x:PL.x,y:PL.y,t:'-1 ❤️ 능력 해제!',c:'#ff5252',life:70});
+        } else {
+          popups.push({x:PL.x,y:PL.y,t:'-1 ❤️ 맨홀!',c:'#ff5252',life:60});
+        }
+        if(hearts<=0){gs='over';showPanel('over');}
+      }
+    }
+  }
+
+  // 간식
+  for(const s of snacks){
+    if(s.used)continue;
+    const sx=s.x-cam;
+    if(PL.x-cam+PL.w>sx+2&&PL.x-cam<sx+28&&PL.y+PL.h>FL-55){
+      s.used=true;hearts=Math.min(maxHearts,hearts+1);score+=10;ChoSFX.item();
+      popups.push({x:PL.x,y:PL.y,t:'+1 ❤️',c:'#ff88aa',life:55});
+    }
+  }
+
+  // NPC 조우
+  if(crossNPC&&!crossNPC.met&&PL.x>crossNPC.x-80){crossNPC.met=true;ChoSFX.npc();showCrossIntro();}
+  if(cafeNPC&&!cafeNPC.met&&PL.x>cafeNPC.x-80){cafeNPC.met=true;ChoSFX.npc();showCafeIntro();}
+  // 집 미션 체크
+  if(!houseMissionDone){
+    for(const h of houseNPCs){
+      if(!h.met&&PL.x>h.x-100){h.met=true;ChoSFX.npc();showHouseIntro(h);break;}
+    }
+  }
+
+  // 택시 씬
+  if(taxiScene&&!taxiScene.active&&!taxiScene.done&&PL.x>taxiScene.x){
+    taxiScene.active=true;showTaxiPanel();
+  }
+
+  popups=popups.filter(p=>{p.life--;p.y-=.5;return p.life>0;});
+}
+
+// ── 인벤토리 사용 ────────────────────────────────
+window.useCatAbility2=()=>{
+  if(!inventory.catAbility)return;
+  PL.catAb=true;PL.dj=false;
+  inventory.catAbility=false;
+  popups.push({x:PL.x,y:PL.y,t:'😸 이중점프!',c:'#ff8a65',life:70});
+  showInvPanel();
+};
+window.useBirdAbility2=()=>{
+  if(!inventory.birdAbility)return;
+  PL.birdAb=true;PL.birdBoosts=4;
+  inventory.birdAbility=false;
+  popups.push({x:PL.x,y:PL.y,t:'🐦 날기!',c:'#42a5f5',life:70});
+  showInvPanel();
+};
+window.useShield=()=>{
+  if(inventory.shield<=0)return;
+  inventory.shield--;
+  hasInvincible=true;invincibleTimer=180;
+  popups.push({x:PL.x,y:PL.y,t:'🛡️ 무적!',c:'#ffd700',life:70});
+  showInvPanel();  // 아이템 목록 갱신
+};
+window.useLifePotion=()=>{
+  if(inventory.lifePotion<=0)return;
+  inventory.lifePotion--;hearts=maxHearts;
+  popups.push({x:PL.x,y:PL.y,t:'💚 하트 가득!',c:'#69f0ae',life:70});
+  showInvPanel();  // 아이템 목록 갱신
+};
+
+// ══════════════════════════════════════════════
+//  미니게임 2: 횡단보도 - 가로 건너기 (사이드뷰)
+// ══════════════════════════════════════════════
+const CR={CW:192,CH:160,LANES:3,CELL:52,ROAD_X:12};
+const CR_ROAD_END=CR.ROAD_X+CR.LANES*CR.CELL;
+let crState={
+  px:6,py:80,col:0,
+  moving:false,targetX:0,
+  cars:[],
+  light:'red',lightTimer:0,
+  alive:true,done:false,hit:false,success:false,
+};
+let crCtx=null,crLoop=null,crLives=3;
+
+function sprOnCtx(ctx,data,sx,sy){
+  data.forEach((row,ry)=>[...row].forEach((c,rx)=>{
+    if(!PAL[c])return;
+    ctx.fillStyle=PAL[c];ctx.fillRect(sx+rx*PS,sy+ry*PS,PS,PS);
+  }));
+}
+function getColX(col){
+  if(col<=0)return 6;
+  if(col>CR.LANES)return CR_ROAD_END+6;
+  return CR.ROAD_X+col*CR.CELL;
+}
+
+function showCrossIntro(){
+  gs='puzzle';OV.style.display='flex';
+  PNL.innerHTML=`
+    <div style="font-size:clamp(28px,6vw,48px);margin-bottom:6px">🚦</div>
+    <h2 style="color:#ff5252">횡단보도!</h2>
+    <div style="background:#1a1a30;border:1px solid #ff5252;padding:12px;margin-bottom:12px;text-align:left;line-height:2">
+      <span class="mg-desc">"앗, 큰 도로다! 차들이 엄청 많아!"</span><br>
+      <span class="mg-desc">"탭/클릭/스페이스로 한 칸씩 오른쪽으로!"</span><br>
+      <span class="mg-hi">"🔴 빨간불엔 못 건너! 차도 조심해! 🚗"</span>
+    </div>
+    <div class="btn-row"><button class="btn g" onclick="startCrossGame()">건너기 시작! 🚶</button>
+    <button class="btn b" onclick="skipPuzzle()">그냥 지나가기</button></div>`;
+}
+window.startCrossGame=()=>{
+  gs='cross_game';
+  if(crLoop)clearInterval(crLoop);
+  crLives=3;
+  crState={px:6,py:CR.CH/2,col:0,moving:false,targetX:6,
+    cars:[],light:'red',lightTimer:0,alive:true,done:false,hit:false,success:false};
+  for(let lane=0;lane<CR.LANES;lane++){
+    const dir=lane%2===0?1:-1;
+    const spd=1.2+Math.random()*1.4;
+    const laneX=CR.ROAD_X+lane*CR.CELL+CR.CELL/2-9;
+    const gap=60+Math.floor(Math.random()*35);
+    for(let i=0;i<3;i++){
+      crState.cars.push({
+        lane,x:laneX,
+        y:dir>0?-44-i*gap:CR.CH+i*gap,
+        vy:dir*spd,w:18,h:34,
+      });
+    }
+  }
+  PNL.innerHTML=`<h2>🚦 길 건너기!</h2>
+    <p>탭 / 스페이스로 한 칸씩 오른쪽으로!<br>🔴 빨간불엔 못 건너! 기회 3번!</p>
+    <canvas id="crc" width="${CR.CW}" height="${CR.CH}" style="display:block;margin:4px auto;border:2px solid #ff5252;cursor:pointer;width:min(480px,88vw);height:auto;aspect-ratio:${CR.CW}/${CR.CH};image-rendering:pixelated"></canvas>
+    <div id="cr_msg" class="mg-sub" style="min-height:16px;margin:4px 0"></div>
+    <button class="btn b" onclick="skipPuzzle()">그냥 지나가기</button>`;
+  setTimeout(()=>{
+    const cc=document.getElementById('crc');if(!cc)return;
+    crCtx=cc.getContext('2d');crCtx.imageSmoothingEnabled=false;
+    cc.addEventListener('click',doCrossStep);
+    cc.addEventListener('touchstart',e=>{e.preventDefault();doCrossStep();},{passive:false});
+    const crKeyH=e=>{
+      if(e.code==='Space'||e.code==='ArrowRight'){e.preventDefault();if(gs==='cross_game')doCrossStep();}
+    };
+    document.addEventListener('keydown',crKeyH);
+    crLoop=setInterval(()=>{
+      if(gs!=='cross_game'){clearInterval(crLoop);document.removeEventListener('keydown',crKeyH);return;}
+      updateCross();drawCross();
+    },16);
+  },60);
+};
+function doCrossStep(){
+  if(!crState.alive||crState.moving||crState.done)return;
+  if(crState.light==='red'){
+    const msg=document.getElementById('cr_msg');
+    if(msg){msg.style.color='#ff5252';msg.textContent='🔴 빨간불! 초록불을 기다려!';}
+    setTimeout(()=>{const m=document.getElementById('cr_msg');if(m)m.textContent='';},700);
+    return;
+  }
+  const nextCol=crState.col+1;
+  if(nextCol>CR.LANES+1){crState.done=true;crState.success=true;return;}
+  crState.moving=true;crState.col=nextCol;
+  crState.targetX=getColX(nextCol);
+}
+function doCrossHit(){doCrossStep();}
+function updateCross(){
+  if(!crState.alive)return;
+  if(crState.moving){
+    const dx=crState.targetX-crState.px;
+    crState.px+=dx>0?Math.min(4,dx):0;
+    if(crState.px>=crState.targetX){crState.px=crState.targetX;crState.moving=false;
+      if(crState.col>CR.LANES){crState.done=true;crState.success=true;}
+    }
+  }
+  crState.lightTimer++;
+  const period=crState.light==='red'?130:90;
+  if(crState.lightTimer>=period){crState.light=crState.light==='red'?'green':'red';crState.lightTimer=0;}
+  crState.cars.forEach(car=>{
+    if(crState.light!=='green'){
+      car.y+=car.vy;
+      if(car.y>CR.CH+50)car.y=-50;
+      if(car.y<-50)car.y=CR.CH+50;
+    }
+    const cx2=car.x+car.w/2,cy2=car.y+car.h/2;
+    if(Math.abs(cx2-crState.px)<car.w/2+12&&Math.abs(cy2-crState.py)<car.h/2+14){
+      crState.alive=false;crState.hit=true;
+    }
+  });
+  if(crState.done&&crState.success){
+    clearInterval(crLoop);gs='puzzle';
+    inventory.shield++;score+=25;
+    ChoSFX.win();PNL.innerHTML=`<h2>🎉 건너기 성공!</h2>
+      <p>완벽하게 건넜어요! 🦺<br>
+      <b style="color:#69f0ae">🛡️ 무적 방패가 인벤에 저장됐어요!</b><br>
+      <small>인벤(B)에서 꺼내 쓰세요!</small></p>
+      <button class="btn g" onclick="resumePlay()">달려! 🐾</button>`;
+  }
+  if(!crState.alive&&crState.hit){
+    crState.hit=false;crLives--;
+    setTimeout(()=>{
+      if(gs!=='cross_game')return;
+      if(crLives<=0){
+        clearInterval(crLoop);gs='puzzle';
+        ChoSFX.fail();PNL.innerHTML=`<h2>😿 횡단보도 실패!</h2>
+          <p>기회를 모두 썼어요.<br>신호 잘 보고 건너야 해!</p>
+          <div class="btn-row"><button class="btn" onclick="startCrossGame()">다시 도전!</button>
+          <button class="btn b" onclick="skipPuzzle()">그냥 가기</button></div>`;
+      } else {
+        crState.alive=true;crState.hit=false;
+        crState.px=6;crState.col=0;crState.moving=false;crState.targetX=6;
+      }
+    },700);
+  }
+}
+function drawCross(){
+  if(!crCtx)return;
+  const c=crCtx;
+  // 왼쪽 인도 (출발)
+  c.fillStyle='#a0a0a0';c.fillRect(0,0,CR.ROAD_X,CR.CH);
+  // 오른쪽 인도 (도착)
+  c.fillStyle='#a0a0a0';c.fillRect(CR_ROAD_END,0,CR.CW-CR_ROAD_END,CR.CH);
+  // 도로
+  c.fillStyle='#484848';c.fillRect(CR.ROAD_X,0,CR.LANES*CR.CELL,CR.CH);
+  // 차선 경계선 (세로 점선)
+  for(let i=0;i<=CR.LANES;i++){
+    const lx=CR.ROAD_X+i*CR.CELL;
+    for(let dy=0;dy<CR.CH;dy+=12){
+      c.fillStyle='rgba(255,255,255,0.2)';
+      c.fillRect(lx-1,dy,2,7);
+    }
+  }
+  // 횡단보도 세로 줄무늬 (가운데 구간만, 3배 두꺼움)
+  const cwY1=CR.CH/2-32,cwY2=CR.CH/2+32;
+  const stripeW=15,stripeGap=8;
+  for(let sx=CR.ROAD_X+3;sx<CR_ROAD_END-3;sx+=stripeW+stripeGap){
+    c.fillStyle='rgba(255,255,255,0.6)';
+    c.fillRect(sx,cwY1,stripeW,cwY2-cwY1);
+  }
+  // 신호 오버레이
+  c.fillStyle=crState.light==='green'?'rgba(50,255,50,0.08)':'rgba(255,50,50,0.05)';
+  c.fillRect(CR.ROAD_X,cwY1,CR.LANES*CR.CELL,cwY2-cwY1);
+  // 보행자 신호등 (오른쪽 인도 위, 세로형)
+  const ltX=CR_ROAD_END+4,ltY=CR.CH/2-22;
+  // 기둥
+  c.fillStyle='#555';c.fillRect(ltX+5,ltY+38,4,CR.CH/2-16);
+  // 신호등 박스
+  c.fillStyle='#111';c.fillRect(ltX,ltY,14,38);
+  c.strokeStyle='#444';c.lineWidth=1;c.strokeRect(ltX,ltY,14,38);
+  // 빨간불 (멈춤 사람 실루엣)
+  c.fillStyle=crState.light==='red'?'#FF2020':'#331010';
+  c.fillRect(ltX+3,ltY+3,8,14);
+  if(crState.light==='red'){
+    c.fillStyle='#FF6060';
+    c.fillRect(ltX+5,ltY+4,4,3);
+    c.fillRect(ltX+4,ltY+7,6,4);
+    c.fillRect(ltX+5,ltY+11,2,4);
+    c.fillRect(ltX+8,ltY+11,2,4);
+  }
+  // 초록불 (걷는 사람 실루엣)
+  c.fillStyle=crState.light==='green'?'#20FF20':'#103310';
+  c.fillRect(ltX+3,ltY+20,8,14);
+  if(crState.light==='green'){
+    c.fillStyle='#60FF60';
+    c.fillRect(ltX+5,ltY+21,4,3);
+    c.fillRect(ltX+4,ltY+24,6,4);
+    c.fillRect(ltX+4,ltY+28,2,4);
+    c.fillRect(ltX+8,ltY+28,2,4);
+  }
+  // 차들
+  crState.cars.forEach(car=>{
+    c.fillStyle='#e53935';c.fillRect(car.x,car.y,car.w,car.h);
+    c.fillStyle='#b71c1c';c.fillRect(car.x+3,car.y,car.w-6,3);
+    c.fillStyle='#fff';c.fillRect(car.x+2,car.y+2,5,7);
+    c.fillRect(car.x+2,car.y+car.h-9,5,7);
+    c.fillStyle='#ffd700';
+    c.fillRect(car.x+5,car.vy>0?car.y+car.h-3:car.y,7,3);
+  });
+  // 도착지 줄
+  c.fillStyle='#69f0ae';c.fillRect(CR_ROAD_END,cwY1,3,cwY2-cwY1);
+  // 플레이어 (픽셀 스프라이트)
+  if(crState.alive){
+    sprOnCtx(c,D_RUN1,crState.px-18,crState.py-21);
+  } else {
+    sprOnCtx(c,D_JMP,crState.px-18,crState.py-21);
+    c.fillStyle='rgba(255,80,80,0.5)';c.beginPath();c.arc(crState.px,crState.py-28,8,0,Math.PI*2);c.fill();
+    c.fillStyle='#fff';c.font='bold 11px Courier New';c.textAlign='center';c.fillText('!',crState.px,crState.py-24);
+  }
+  // 기회 표시
+  c.fillStyle='rgba(0,0,0,0.55)';c.fillRect(0,CR.CH-16,CR.CW,16);
+  c.fillStyle='#ff5252';c.font='bold 8px Courier New';c.textAlign='left';
+  c.fillText('기회:'+'♥'.repeat(Math.max(0,crLives))+'♡'.repeat(Math.max(0,3-crLives)),3,CR.CH-5);
+  c.fillStyle='#aaa';c.font='7px Courier New';c.textAlign='right';
+  c.fillText('탭/스페이스→',CR.CW-3,CR.CH-5);
+}
+
+// ══════════════════════════════════════════════
+//  미니게임 3: 카페 멍푸치노 만들기
+// ══════════════════════════════════════════════
+const COFFEE_RECIPE=['☕ 에스프레소 추출','🥛 우유 스티밍','🍯 꿀 한 방울','🐾 조백호 쿠키 올리기','🎨 라떼아트'];
+let coffeeStep=0,coffeeWrong=0;
+
+function showCafeIntro(){
+  gs='puzzle';OV.style.display='flex';
+  PNL.innerHTML=`
+    <div style="font-size:clamp(28px,6vw,48px);margin-bottom:6px">☕</div>
+    <h2 style="color:#E8B840">카페 도착!</h2>
+    <div style="background:#1a1a30;border:1px solid #E8B840;padding:12px;margin-bottom:12px;text-align:left;line-height:2">
+      <span class="mg-desc">"우와, 강아지 카페다! 멍푸치노를 팔고 있어!"</span><br>
+      <span class="mg-desc">"직접 만들어볼 수 있대! 레시피대로 순서를 맞춰봐!"</span><br>
+      <span class="mg-hi">"성공하면 체력이 올라간다고~~ 🐾☕"</span>
+    </div>
+    <div class="btn-row"><button class="btn g" onclick="startCafeGame()">멍푸치노 만들기! ☕</button>
+    <button class="btn b" onclick="skipPuzzle()">그냥 지나가기</button></div>`;
+}
+window.startCafeGame=()=>{
+  coffeeStep=0;coffeeWrong=0;
+  renderCafePanel();
+};
+function renderCafePanel(){
+  const shuffled=[...COFFEE_RECIPE].sort(()=>Math.random()-.5);
+  PNL.innerHTML=`<h2>☕ 멍푸치노 레시피!</h2>
+    <p>순서대로 클릭해서 만들어봐!<br>진행: <b style="color:#E8B840">${coffeeStep}/${COFFEE_RECIPE.length}</b> 단계</p>
+    <div style="margin:8px 0">
+      ${shuffled.map(s=>`<div class="recipe-step ${coffeeStep>COFFEE_RECIPE.indexOf(s)?'done':''}"
+        onclick="cafeClick('${s}')" id="rs_${COFFEE_RECIPE.indexOf(s)}">${s}</div>`).join('')}
+    </div>
+    <div id="cafe_msg" class="mg-sub" style="min-height:18px;margin-top:4px"></div>
+    <div class="btn-row"><button class="btn b" style="margin-top:6px" onclick="skipPuzzle()">그냥 지나가기</button></div>`;
+}
+window.cafeClick=step=>{
+  const correct=COFFEE_RECIPE[coffeeStep];
+  const msg=document.getElementById('cafe_msg');
+  if(step===correct){
+    coffeeStep++;
+    if(msg){msg.style.color='#69f0ae';msg.textContent='✓ 맞아요!';}
+    // 완성!
+    if(coffeeStep>=COFFEE_RECIPE.length){
+      maxHearts=7;hearts=Math.min(maxHearts,hearts+1);
+      ChoSFX.win();PNL.innerHTML=`<h2>🎉 멍푸치노 완성!</h2>
+        <p>레시피 완벽 마스터! ☕🐾<br>
+        <b style="color:#ffd700">최대 체력이 5 → 7로 늘었어요!</b><br>
+        하트도 1개 회복됐어요!</p>
+        <button class="btn g" onclick="resumePlay()">계속 달리기! 🐾</button>`;
+    } else {
+      setTimeout(renderCafePanel,350);
+    }
+  } else {
+    coffeeWrong++;
+    if(msg){msg.style.color='#ff5252';msg.textContent=`❌ 순서가 틀렸어요! (${coffeeWrong}번 틀림)`;}
+    const el=document.querySelector('.recipe-step:not(.done)');
+    if(el){el.classList.add('wrong');setTimeout(()=>el.classList.remove('wrong'),500);}
+    if(coffeeWrong>=5){
+      ChoSFX.fail();PNL.innerHTML=`<h2>😅 레시피 실패!</h2>
+        <p>5번이나 틀렸어요... 다시 해볼까요?</p>
+        <div class="btn-row"><button class="btn" onclick="startCafeGame()">다시 도전!</button>
+        <button class="btn b" onclick="skipPuzzle()">그냥 가기</button></div>`;
+    }
+  }
+};
+
+
+const DOG_INFO_CH2={
+  chiwa:{name:'똘이',breed:'치와와',icon:'🐕',color:'#D4A058',cardColor:'#8B4C18'},
+  pug:{name:'복이',breed:'퍼그',icon:'🐶',color:'#C8A060',cardColor:'#6B4020'},
+  poodle:{name:'솜이',breed:'푸들',icon:'🐩',color:'#E0E0E0',cardColor:'#808080'},
+};
+// ══════════════════════════════════════════════
+//  보너스: 강아지 집 찾기 - 카드 매칭
+// ══════════════════════════════════════════════
+let currentHouse=null;
+
+function showHouseIntro(house){
+  currentHouse=house;
+  gs='puzzle';OV.style.display='flex';
+  const myDog=DOG_INFO_CH2[ch1DogType]||DOG_INFO_CH2.chiwa;
+  const houseOwnerDog=DOG_INFO_CH2[house.dogType]||DOG_INFO_CH2.chiwa;
+  const isRight=house.dogType===ch1DogType;
+  PNL.innerHTML=`
+    <div style="font-size:clamp(26px,5vw,44px);margin-bottom:4px">🏠</div>
+    <h2 style="color:#ffb74d">집 발견!</h2>
+    <div style="background:#1a1a30;border:1px solid #ffb74d;padding:10px;margin-bottom:10px;text-align:left;line-height:1.9">
+      <span class="mg-desc">"우리 강아지 찾아왔나요?"</span><br>
+      <span class="mg-sub" style="font-style:italic">(집 주인이 나와서 카드를 꺼내요)</span><br>
+      <span class="mg-hi">"카드를 맞춰봐요! 같으면 우리 강아지!"</span>
+    </div>
+    <div class="btn-row"><button class="btn g" onclick="startCardMatch()">카드 내기! 🃏</button>
+    <button class="btn b" onclick="skipHouse()">다음 집 보기</button></div>`;
+}
+
+window.skipHouse=()=>{OV.style.display='none';gs='playing';};
+
+window.startCardMatch=()=>{
+  if(!currentHouse)return;
+  const myDog=DOG_INFO_CH2[ch1DogType]||DOG_INFO_CH2.chiwa;
+  const ownerDog=DOG_INFO_CH2[currentHouse.dogType]||DOG_INFO_CH2.chiwa;
+  const dogs=Object.keys(DOG_INFO_CH2);
+  // 집 주인 카드: 실제 강아지 종류
+  const ownerCard=currentHouse.dogType;
+  // 백호 카드: 항상 자기 강아지
+  const myCard=ch1DogType;
+
+  renderCardMatch(myCard, ownerCard, false);
+};
+
+let _pendingMyCard='',_pendingOwnerCard='';
+window.doRevealCard=function(){revealCard(_pendingMyCard,_pendingOwnerCard);};
+function renderCardMatch(myCard, ownerCard, revealed){
+  _pendingMyCard=myCard;_pendingOwnerCard=ownerCard;
+  const myDog=DOG_INFO_CH2[myCard];
+  const ownerDog=DOG_INFO_CH2[ownerCard];
+  const match=myCard===ownerCard;
+
+  const cardStyle=(dog,show)=>
+    '<div style="width:min(100px,22vw);height:min(120px,26vw);background:'+(show?dog.cardColor:'#1a1a40')+
+    ';border:3px solid '+(show?dog.color:'#444')+
+    ';border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:clamp(24px,5vw,36px);color:#fff;gap:8px">'+
+    (show?('<span>'+dog.icon+'</span><span class="mg-sub" style="font-weight:bold">'+dog.breed+'</span>'):'<span style="font-size:clamp(20px,4vw,28px)">🂠</span>')+'</div>';
+
+  PNL.innerHTML='<h2>🃏 카드 매칭!</h2>'+
+    '<p class="mg-sub">백호의 카드 vs 집 주인의 카드<br>같으면 이 강아지의 집!</p>'+
+    '<div style="display:flex;gap:20px;justify-content:center;align-items:flex-end;margin:12px 0">'+
+      '<div style="text-align:center">'+
+        cardStyle(myDog,true)+
+        '<div class="mg-sub" style="margin-top:6px">🐾 백호</div>'+
+      '</div>'+
+      '<div style="font-size:clamp(20px,4vw,28px);align-self:center">'+(revealed?(match?'💚':'💔'):'VS')+'</div>'+
+      '<div style="text-align:center">'+
+        cardStyle(ownerDog,revealed)+
+        '<div class="mg-sub" style="margin-top:6px">🏠 집 주인</div>'+
+      '</div>'+
+    '</div>'+
+    (!revealed?
+      '<button class="btn g" style="width:100%" onclick="doRevealCard()">뒤집기! 🃏</button>'
+      :(match?
+        '<p style="color:#69f0ae;font-weight:bold">💚 맞아요! '+ownerDog.breed+' '+ownerDog.name+'의 집!</p>'+
+        '<button class="btn g" onclick="onHouseFound()">집 찾았어요! 🎉</button>'
+        :
+        '<p style="color:#ff8a65">💔 다른 강아지의 집이에요...<br>'+ownerDog.breed+' '+ownerDog.name+'네였어요!</p>'+
+        '<button class="btn b" onclick="skipHouse()">다음 집 보기 →</button>'
+      )
+    );
+}
+
+window.revealCard=function(myCard, ownerCard){
+  renderCardMatch(myCard, ownerCard, true);
+};
+
+window.onHouseFound=function(){
+  currentHouse.found=true;
+  houseMissionDone=true;
+  chiwaFriend.active=false;  // 집에 들어감
+  score+=25;
+  inventory.lifePotion++;  // 생명수 보상
+  hearts=maxHearts;         // 즉시 하트도 가득
+  const myDog=DOG_INFO_CH2[ch1DogType]||DOG_INFO_CH2.chiwa;
+  OV.style.display='flex';gs='puzzle';
+  ChoSFX.win();PNL.innerHTML='<h2>🎉 집 찾았어요!</h2>'+
+    '<p>'+myDog.breed+' <b style="color:'+myDog.color+'">'+myDog.name+'</b>가 드디어 집에 돌아왔어요! 🏠💕<br>'+
+    '<span class="mg-sub">"멍멍! (고마워요~)"</span><br><br>'+
+    '<b style="color:#69f0ae">🧪 생명수를 보상으로 받았어요!</b><br>'+
+    '<span class="mg-sub">인벤(B)에 보관됩니다. 하트도 가득 찼어요!</span></p>'+
+    '<button class="btn g" onclick="resumePlay()">계속 달리기! 🐾</button>';
+};
+
+function showDollyHouseIntro(){showHouseIntro(houseNPCs[0]||{x:900,dogType:ch1DogType,met:true});}
+function checkDollyMission(){}
+
+// ══════════════════════════════════════════════
+//  마지막: 택시 잡기 미니게임
+// ══════════════════════════════════════════════
+let taxiMini={
+  active:false,chances:3,used:0,
+  tx:0,speed:7.2,caught:false,
+  isEmpty:true,  // 빈택시 여부
+  phase:'idle',
+  ctx:null,loop:null,
+  catchZoneX:100,catchZoneW:80,
+  waving:false,waveTimer:0,
+};
+
+function showTaxiPanel(){
+  gs='puzzle';OV.style.display='flex';
+  Object.assign(taxiMini,{chances:3,used:0,tx:320,caught:false,phase:'idle',waving:false,waveTimer:0});
+  PNL.innerHTML=`<h2>🚕 택시 잡기!</h2>
+    <p>시내 탐험 완료! 이제 3장 산으로 가야 해!<br>
+    <b style="color:#69f0ae">🟢 초록 등 = 빈택시</b> → 잡기!<br>
+    <b style="color:#ff5252">🔴 빨간 등 = 손님 있음</b> → 패스!<br>
+    노란 구역에서 스페이스 / 탭!<br>
+    <span style="color:#ff8a65">손님 있는 택시를 잡으면 기회 차감!</span></p>
+    <button class="btn g" onclick="startTaxiMini()">기다리기! 🙋</button>`;
+}
+
+window.startTaxiMini=()=>{
+  if(taxiMini.loop)clearInterval(taxiMini.loop);
+  taxiMini.tx=320;taxiMini.phase='running';taxiMini.waving=false;taxiMini.waveTimer=0;
+  taxiMini.isEmpty=Math.random()<0.6; // 60% 확률로 빈택시
+  const CW=300,CH=160;
+  PNL.innerHTML=`<h2>🚕 택시 잡기! (${taxiMini.chances-taxiMini.used}번 남음)</h2>
+    <p>노란 구역에 택시가 오면 탭 / 스페이스!</p>
+    <canvas id="txc" width="${CW}" height="${CH}" style="display:block;margin:4px auto;border:2px solid #ffd700;cursor:pointer;width:min(480px,88vw);height:auto;aspect-ratio:${CW}/${CH};image-rendering:pixelated"></canvas>
+    <div id="tx_msg" class="mg-sub" style="min-height:16px;margin:4px 0"></div>
+    <button class="btn b" onclick="skipPuzzle()">포기하기</button>`;
+  setTimeout(()=>{
+    const tc=document.getElementById('txc');if(!tc)return;
+    taxiMini.ctx=tc.getContext('2d');
+    // 입력 핸들러
+    const onWave=()=>{
+      if(taxiMini.phase!=='running')return;
+      const inZone=taxiMini.tx>=taxiMini.catchZoneX&&taxiMini.tx<=taxiMini.catchZoneX+taxiMini.catchZoneW;
+      if(inZone&&taxiMini.isEmpty){
+        // 빈택시 성공!
+        taxiMini.caught=true;taxiMini.phase='success';taxiMini.waving=true;
+        clearInterval(taxiMini.loop);
+        document.removeEventListener('keydown',kh);
+        drawTaxiMini(CW,CH);
+        setTimeout(()=>{
+          taxiScene.done=true;
+          localStorage.setItem('ch2_save',JSON.stringify({score,hearts,maxHearts,hadChiwa:chiwaFriend.active,dogType:ch1DogType,catAbility:inventory.catAbility,catEquipped:PL.catAb&&!inventory.catAbility,birdAbility:inventory.birdAbility,birdEquipped:PL.birdAb&&!inventory.birdAbility,lifePotion:inventory.lifePotion,shield:inventory.shield,items:inventory.items}));
+          gs='clear';showPanel('clear');
+        },1500);
+      } else if(inZone&&!taxiMini.isEmpty){
+        // 일반택시 구역 - 손님 있음, 기회 차감
+        taxiMini.used++;
+        const msg=document.getElementById('tx_msg');
+        if(msg){msg.style.color='#ff8a65';msg.textContent='🔴 손님 있는 택시! (남은 기회: '+(taxiMini.chances-taxiMini.used)+'번)';}
+        setTimeout(()=>{const m=document.getElementById('tx_msg');if(m)m.textContent='';},800);
+        if(taxiMini.used>=taxiMini.chances){
+          clearInterval(taxiMini.loop);document.removeEventListener('keydown',kh);
+          taxiMini.phase='fail';
+          ChoSFX.fail();PNL.innerHTML='<h2>😿 택시를 못 잡았어요!</h2><p>3번 다 놓쳤어요...<br><span style="color:#ff5252">2장 실패</span></p><button class="btn" onclick="initGame();startGame()">다시 도전!</button>';
+        }
+      } else {
+        // 구역 밖 - 카운트 없음, 메시지만
+        const msg=document.getElementById('tx_msg');
+        if(msg){msg.style.color='#ff5252';msg.textContent='⛔ 아직 구역 밖이에요!';}
+        setTimeout(()=>{const m=document.getElementById('tx_msg');if(m)m.textContent='';},500);
+      }
+    };
+    tc.addEventListener('click',onWave);
+    tc.addEventListener('touchstart',e=>{e.preventDefault();onWave();},{passive:false});
+    const kh=e=>{if((e.code==='Space'||e.code==='ArrowUp')&&gs==='puzzle'){e.preventDefault();onWave();}};
+    document.addEventListener('keydown',kh);
+
+    taxiMini.loop=setInterval(()=>{
+      if(gs!=='puzzle'){clearInterval(taxiMini.loop);document.removeEventListener('keydown',kh);return;}
+      if(taxiMini.phase==='running'){
+        taxiMini.tx-=taxiMini.speed;
+        if(taxiMini.waveTimer>0)taxiMini.waveTimer--;
+        // 택시가 구역 지나침 - 기회 차감 없이 그냥 새 택시
+        if(taxiMini.tx<-80){
+          taxiMini.tx=320;
+          taxiMini.isEmpty=Math.random()<0.6;
+          const h=document.querySelector('#pnl h2');
+          if(h)h.textContent=`🚕 택시 잡기! (${taxiMini.chances-taxiMini.used}번 남음)`;
+        }
+      }
+      drawTaxiMini(CW,CH);
+    },16);
+  },60);
+};
+window.startTaxiScene=window.startTaxiMini;  // 하위 호환
+
+function drawTaxiMini(CW,CH){
+  const c=taxiMini.ctx;if(!c)return;
+  // 배경
+  c.fillStyle='#383838';c.fillRect(0,0,CW,CH);
+  // 인도
+  c.fillStyle='#a0a0a0';c.fillRect(0,0,CW,50);
+  c.fillStyle='#888';c.fillRect(0,48,CW,4);
+  // 도로
+  c.fillStyle='#484848';c.fillRect(0,52,CW,CH-52);
+  // 차선
+  for(let i=0;i<8;i++){c.fillStyle='rgba(255,215,0,0.5)';c.fillRect(i*42,CH/2+20,28,5);}
+  // 잡기 존 강조 (노란 구역)
+  const cz=taxiMini.catchZoneX,czw=taxiMini.catchZoneW;
+  c.fillStyle='rgba(255,215,0,0.25)';c.fillRect(cz,52,czw,CH-52);
+  c.strokeStyle='#ffd700';c.lineWidth=2;c.setLineDash([6,4]);
+  c.strokeRect(cz,52,czw,CH-52);c.setLineDash([]);
+  c.fillStyle='rgba(255,215,0,0.9)';c.font='bold 9px Courier New';c.textAlign='center';
+  c.fillText('잡기 구역',cz+czw/2,66);
+  // 택시
+  const tx=taxiMini.tx,ty=CH-60;
+  if(tx>-80&&tx<CW+80){
+    // 택시 몸통
+    c.fillStyle=taxiMini.caught?'#FFD700':'#FFD700';c.fillRect(tx,ty,70,28);
+    c.fillStyle='#CC9900';c.fillRect(tx+5,ty,60,8);
+    // 창문
+    c.fillStyle='#aaddff';c.fillRect(tx+8,ty+8,18,12);c.fillRect(tx+34,ty+8,18,12);
+    // 바퀴
+    c.fillStyle='#222';c.beginPath();c.arc(tx+14,ty+28,7,0,Math.PI*2);c.fill();
+    c.beginPath();c.arc(tx+56,ty+28,7,0,Math.PI*2);c.fill();
+    // 상단 등 (빈택시=초록, 손님있음=빨강)
+    c.fillStyle='#222';c.fillRect(tx+18,ty-16,34,14);
+    c.fillStyle=taxiMini.isEmpty?'#00CC44':'#CC2020';
+    c.fillRect(tx+20,ty-14,30,10);
+    c.fillStyle='#fff';c.font='bold 7px Courier New';c.textAlign='center';
+    c.fillText(taxiMini.isEmpty?'빈 차':'손님 있',tx+35,ty-6);
+    if(taxiMini.caught){
+      c.fillStyle='#ffd700';c.font='bold 12px Courier New';c.textAlign='center';
+      c.fillText('🎉',tx+35,ty-24);
+    }
+  }
+  // 조백호 픽셀 그리기 (인도에서 기다림)
+  const wave=taxiMini.waving||taxiMini.caught;
+  const bx=16,by=4;  // 기준점
+  // 꼬리
+  c.fillStyle='#F2F0E8';
+  [[bx-4,by+20],[bx-5,by+18],[bx-6,by+16],[bx-6,by+14],[bx-5,by+12]].forEach(([x,y])=>{c.fillRect(x,y,3,3);});
+  // 몸통
+  c.fillStyle='#FFFFFF';c.fillRect(bx,by+14,18,12);
+  c.fillStyle='#F5F5F5';c.fillRect(bx+2,by+15,14,10);
+  // 다리 (앉아있는 자세)
+  c.fillStyle='#F8F8F8';
+  c.fillRect(bx+2,by+26,5,5);c.fillRect(bx+11,by+26,5,5);
+  // 머리
+  c.fillStyle='#FFFFFF';c.fillRect(bx+4,by+4,16,14);
+  c.fillStyle='#F5F5F5';c.fillRect(bx+6,by+6,12,10);
+  // 귀
+  c.fillStyle='#FFFFFF';
+  c.fillRect(bx+4,by+2,4,5);c.fillRect(bx+14,by+2,4,5);
+  c.fillStyle='#FFD0D0';c.fillRect(bx+5,by+2,2,3);c.fillRect(bx+15,by+2,2,3);
+  // 눈
+  c.fillStyle='#000000';c.fillRect(bx+7,by+7,3,3);c.fillRect(bx+14,by+7,3,3);
+  c.fillStyle='#FFF';c.fillRect(bx+8,by+7,1,1);c.fillRect(bx+15,by+7,1,1);
+  // 코
+  c.fillStyle='#333';c.fillRect(bx+10,by+11,4,3);
+  c.fillStyle='#FFF';c.fillRect(bx+10,by+11,2,1);
+  // 느낌표 표시 (택시 잡기 가능할 때)
+  if(wave){
+    // 느낌표 배경 원
+    c.fillStyle='rgba(255,215,0,0.9)';
+    c.beginPath();c.arc(bx+28,by+6,10,0,Math.PI*2);c.fill();
+    c.fillStyle='#111';c.font='bold 14px Courier New';c.textAlign='center';
+    c.fillText('!',bx+28,by+11);
+  }
+  // 기본 앞발
+  c.fillStyle='#F2F0E8';c.fillRect(bx+16,by+20,4,8);
+  // 화살표 힌트
+  if(!taxiMini.caught&&taxiMini.phase==='running'){
+    c.fillStyle='rgba(255,215,0,0.8)';c.font='bold 10px Courier New';c.textAlign='center';
+    c.fillText('▼ 여기서 눌러!',cz+czw/2,CH-8);
+  }
+}
+
+function updateTaxi(){} // 더 이상 playing 루프에서 호출 안 함
+
+// ══════════════════════════════════════════════
+//  LEADERBOARD
+// ══════════════════════════════════════════════
+const LB_KEY='chobaekho_ch2_lb';
+function loadLB(){try{const r=localStorage.getItem(LB_KEY);return r?JSON.parse(r):[];}catch(e){return[];}}
+function saveLB(e){try{localStorage.setItem(LB_KEY,JSON.stringify(e));}catch(e){}}
+function addLBEntry(name,pts){
+  let e=loadLB();
+  const now=new Date();
+  const d=now.getFullYear()+'.'+(now.getMonth()+1).toString().padStart(2,'0')+'.'+now.getDate().toString().padStart(2,'0');
+  e.push({name:name||'익명',score:pts,date:d});
+  e.sort((a,b)=>b.score-a.score);if(e.length>20)e=e.slice(0,20);saveLB(e);return e;
+}
+window.showLeaderboard=()=>{
+  OV.style.display='flex';
+  const entries=loadLB();
+  PNL.innerHTML=`<h2>🏆 점수 기록 (2장)</h2>
+    <p style="color:#ffd700">이번 점수: <b>${score}</b></p>
+    <div style="margin:8px 0">
+      <input id="lb_name" maxlength="10" placeholder="이름 입력 (최대 10자)"
+        style="background:#1a1a30;border:2px solid #ffd700;color:#fff;padding:clamp(6px,1vw,10px) clamp(10px,1.5vw,16px);font-size:clamp(14px,2vw,20px);font-family:Courier New;width:min(280px,70vw);text-align:center;">
+    </div>
+    <div class="btn-row"><button class="btn g" onclick="submitLB()">기록 등록! 🐾</button>
+    <button class="btn b" onclick="skipLB()">그냥 보기</button></div>
+    <div id="lb_list" style="margin-top:8px">${renderLBRows(entries,-1)}</div>`;
+};
+function renderLBRows(entries,hi){
+  if(!entries.length)return'<p class="mg-sub">아직 기록이 없어요!</p>';
+  return`<table style="width:100%;border-collapse:collapse;border-top:1px solid #333">
+    <tr>${['순위','이름','점수','날짜'].map(h=>`<th style="color:#888;font-size:clamp(12px,1.8vw,18px);padding:4px">${h}</th>`).join('')}</tr>
+    ${entries.map((e,i)=>`<tr style="background:${i===hi?'rgba(255,215,0,0.15)':''}">
+      <td style="color:#888;font-size:clamp(12px,1.8vw,18px);padding:4px">${i===0?'🥇':i===1?'🥈':i===2?'🥉':'#'+(i+1)}</td>
+      <td style="color:${i===hi?'#fff':'#ccc'};font-size:clamp(12px,1.8vw,18px);padding:4px">${e.name}</td>
+      <td style="color:#ffd700;font-size:clamp(13px,2vw,20px);font-weight:bold;padding:4px">${e.score}</td>
+      <td style="color:#555;font-size:clamp(11px,1.6vw,16px);padding:4px">${e.date}</td>
+    </tr>`).join('')}
+  </table>`;
+}
+window.submitLB=()=>{
+  const inp=document.getElementById('lb_name');
+  const name=inp?inp.value.trim():'';
+  const entries=addLBEntry(name,score);
+  const myIdx=entries.findIndex(e=>e.score===score&&e.name===(name||'익명'));
+  const lb=document.getElementById('lb_list');if(lb)lb.innerHTML=renderLBRows(entries,myIdx);
+  const btn=document.querySelector('.btn.g');if(btn){btn.textContent='✅ 등록됨!';btn.disabled=true;}
+};
+window.skipLB=()=>{
+  const entries=loadLB();
+  PNL.innerHTML=`<h2>🏆 리더보드 (2장)</h2>${renderLBRows(entries,-1)}
+    <button class="btn g" style="margin-top:8px" onclick="initGame();startGame()">다시 하기!</button>`;
+};
+
+// ══════════════════════════════════════════════
+//  그리기 함수들
+// ══════════════════════════════════════════════
+function drawSky(){
+  // 시내 하늘 - 약간 탁한 도시 느낌
+  const grd=cx.createLinearGradient(0,0,0,H*.6);
+  grd.addColorStop(0,'#8898C0');grd.addColorStop(.5,'#A0B0D0');grd.addColorStop(1,'#B8C8E0');
+  cx.fillStyle=grd;cx.fillRect(0,0,W,H);
+}
+
+function drawBuilding(x,y,w,h,style,seed){
+  if(x>W+30||x+w<-30)return;
+  const walls=['#3A4858','#404858','#383C50','#3C4460','#445060','#384040','#3A3C58'];
+  const trims=['#2A3848','#303848','#282C40','#2C3450','#344050','#283030','#2A2C48'];
+  const accents=['#5080A0','#4A7080','#506090','#485880','#607890'];
+  const wc=walls[style%7],tc=trims[style%7],ac=accents[style%5];
+  // 빌딩 형태 다양화 (style에 따라)
+  if(style%5===0){
+    // 계단식 빌딩
+    fillR(x,y,w,h,wc);
+    fillR(x+Math.floor(w*.15),y-Math.floor(h*.15),Math.floor(w*.7),Math.floor(h*.15),wc);
+    fillR(x+Math.floor(w*.3),y-Math.floor(h*.3),Math.floor(w*.4),Math.floor(h*.15),wc);
+  } else if(style%5===1){
+    // 유리 커튼월 빌딩
+    fillR(x,y,w,h,'#2A3850');
+    for(let ri=0;ri<Math.floor(h/12);ri++){
+      fillR(x+2,y+ri*12,w-4,9,'#3A5068');
+    }
+    fillR(x,y,4,h,ac);fillR(x+w-4,y,4,h,ac);
+  } else if(style%5===2){
+    // 줄무늬 빌딩
+    fillR(x,y,w,h,wc);
+    for(let ri=0;ri<Math.floor(h/16);ri++){
+      fillR(x,y+ri*16,w,4,tc);
+    }
+  } else {
+    fillR(x,y,w,h,wc);
+  }
+  // 창문 그리드
+  const cols=Math.max(2,Math.floor(w/18));
+  const rows=Math.max(2,Math.floor(h/20));
+  const ww=Math.max(8,Math.floor((w-10)/(cols+1)));
+  const wh=Math.max(8,Math.floor((h*.75-10)/(rows+1)));
+  for(let ri=0;ri<rows;ri++){
+    for(let ci=0;ci<cols;ci++){
+      const wx=x+6+ci*(ww+5);const wy=y+8+ri*(wh+6);
+      // 불빛 완전 고정 (정수 해시만 사용, 절대 변하지 않음)
+      const s2=seed!==undefined?seed:Math.round(x);
+      const hash=(s2*31+ri*17+ci*7+style*3)&0xFFFF;
+      const lit=(hash%10)<4;  // 40% 켜짐
+      const winCol=style%5===1?'#5888A8':(lit?'#C8BC60':'#181E2C');
+      fillR(wx,wy,ww,wh,winCol);
+    }
+  }
+  // 옥상 (다양한 형태)
+  fillR(x-3,y-8,w+6,10,tc);
+  if(style%3===0)fillR(x+w/2-4,y-18,8,12,ac); // 안테나
+  if(style%4===1)fillR(x+w/2-10,y-12,20,6,ac); // 물탱크 느낌
+}
+
+function drawRoad(){
+  // 인도
+  fillR(0,FL-8,W,H-FL+8,'#A0A0A0');
+  for(let i=0;i<W/32+2;i++){fillR(i*32-(cam%32),FL-8,30,2,'#888');}
+  // 도로 (아래)
+  fillR(0,FL+30,W,H-FL-30,'#404040');
+  // 차선
+  for(let i=0;i<W/48+2;i++){
+    fillR(i*48-(cam%48),FL+56,32,4,'#FFD020');
+  }
+  // 점선
+  for(let i=0;i<W/24+2;i++){
+    fillR(i*24-(cam%24),FL+44,14,3,'#ffffff');
+  }
+}
+
+function drawCrosswalks(){
+  // 세계 곳곳에 횡단보도
+  for(let cx2=600;cx2<WORLD;cx2+=700){
+    const sx=cx2-cam;if(sx<-60||sx>W+60)continue;
+    for(let s=0;s<6;s++)fillR(sx+s*8,FL-8,6,40,'rgba(255,255,255,0.7)');
+    // 신호등 기둥
+    fillR(sx-8,FL-90,6,82,'#555');
+    fillR(sx-12,FL-92,14,8,'#333');
+    // 신호등 박스
+    const isGreen=Math.floor((frame+cx2)/(60))%2===0;
+    fillR(sx-14,FL-92,18,34,'#222');
+    fillR(sx-12,FL-90,14,12,isGreen?'#444':'#FF3333');
+    fillR(sx-12,FL-76,14,12,isGreen?'#44FF44':'#444');
+  }
+}
+
+function drawTrafficLights(){
+  // 가로등 (시내용)
+  for(let lx=320;lx<WORLD;lx+=380){
+    const sx=lx-cam;if(sx<-20||sx>W+20)continue;
+    fillR(sx-3,FL-140,6,140,'#484848');
+    fillR(sx-18,FL-142,36,10,'#383838');
+    fillR(sx-20,FL-152,40,12,'#FFE080');
+    cx.fillStyle='rgba(255,220,100,0.15)';cx.beginPath();cx.arc(sx,FL-146,28,0,Math.PI*2);cx.fill();
+  }
+}
+
+function drawBG(){
+  drawSky();
+
+  // 작은 구름 (회색빛)
+  cx.fillStyle='rgba(200,210,220,0.7)';
+  [[100,40,38],[350,28,30],[600,44,34],[760,32,26]].forEach(([bx,by,br])=>{
+    const wx=((bx-frame*.15)%(W+100)+W+100)%W;
+    cx.beginPath();cx.arc(wx,by,br,0,Math.PI*2);
+    cx.arc(wx+br*.6,by-br*.2,br*.65,0,Math.PI*2);
+    cx.arc(wx-br*.55,by+br*.1,br*.55,0,Math.PI*2);
+    cx.fill();if(wx+br*2>W){
+      cx.beginPath();cx.arc(wx-W,by,br,0,Math.PI*2);
+      cx.arc(wx-W+br*.6,by-br*.2,br*.65,0,Math.PI*2);cx.fill();
+    }
+  });
+
+  // 원거리 빌딩 (패럴랙스 0.2)
+  buildings.far.forEach(b=>{
+    const sx=b.wx-cam*.2;
+    if(sx>W+30||sx+b.bw<-30)return;
+    drawBuilding(sx,290-b.bh,b.bw,b.bh,b.style,b.wx);
+  });
+  // 중거리 빌딩 (패럴랙스 0.55)
+  buildings.mid.forEach(b=>{
+    const sx=b.wx-cam*.55;
+    if(sx>W+30||sx+b.bw<-30)return;
+    drawBuilding(sx,280-b.bh,b.bw,b.bh,b.style,b.wx);
+  });
+
+  drawCrosswalks();
+  drawRoad();
+  drawTrafficLights();
+  drawStreetTrees();
+}
+
+function drawStreetTrees(){
+  treePositions.forEach(t=>{
+    const sx=t.x-cam;
+    if(sx<-40||sx>W+40)return;
+    fillR(sx-4,FL-78,8,78,'#5A3A18');
+    fillR(sx-4,FL-78,3,78,'#3A2010');
+    if(t.v===0){
+      cx.fillStyle='#2A7828';cx.beginPath();cx.arc(sx,FL-84,22,0,Math.PI*2);cx.fill();
+      cx.fillStyle='#358030';cx.beginPath();cx.arc(sx-6,FL-91,15,0,Math.PI*2);cx.fill();
+      cx.fillStyle='#409040';cx.beginPath();cx.arc(sx,FL-99,12,0,Math.PI*2);cx.fill();
+    } else if(t.v===1){
+      cx.fillStyle='#286828';cx.beginPath();cx.ellipse(sx,FL-95,14,28,0,0,Math.PI*2);cx.fill();
+      cx.fillStyle='#347030';cx.beginPath();cx.ellipse(sx,FL-95,10,22,0,0,Math.PI*2);cx.fill();
+    } else {
+      cx.fillStyle='#2E7030';cx.beginPath();cx.arc(sx,FL-81,26,0,Math.PI*2);cx.fill();
+      cx.fillStyle='#388538';cx.beginPath();cx.arc(sx-10,FL-87,18,0,Math.PI*2);cx.fill();
+      cx.beginPath();cx.arc(sx+10,FL-85,18,0,Math.PI*2);cx.fill();
+      cx.fillStyle='#409042';cx.beginPath();cx.arc(sx,FL-95,16,0,Math.PI*2);cx.fill();
+    }
+  });
+}
+
+function drawManholes(){
+  manholes.forEach(m=>{
+    if(m.used)return;
+    const sx=m.x-cam-4;if(sx<-30||sx>W+30)return;
+    spr(MANHOLE,sx,FL-14);
+  });
+}
+
+function drawSnacks(){
+  snacks.forEach(s=>{
+    if(s.used)return;
+    const sx=s.x-cam;if(sx<-60||sx>W+60)return;
+    const ph=PERSON_H[s.type];
+    spr(PERSON_SP[s.type],sx,FL-ph);
+    cx.font='18px serif';cx.textAlign='center';
+    cx.fillText(['🌭','🐟🍞','🍖','🍬'][s.type],sx+12,FL-ph-14);
+    cx.fillStyle='rgba(255,255,220,.92)';cx.fillRect(sx-10,FL-ph-38,66,14);
+    cx.strokeStyle='#888';cx.lineWidth=1;cx.strokeRect(sx-10,FL-ph-38,66,14);
+    cx.fillStyle='#444';cx.font='9px Courier New';cx.textAlign='left';
+    cx.fillText(PERSON_MSG[s.type],sx-7,FL-ph-27);
+  });
+}
+
+function drawDollyHouse(sx,hDogType){
+  // 큰 주택 - 담장, 마당, 파란 대문
+  const hw=140,hh=120,hy=FL-hh;
+  // 마당 바닥
+  cx.fillStyle='#8B7355';cx.fillRect(sx-20,FL-12,hw+40,12);
+  // 집 벽
+  cx.fillStyle='#E8D8B0';cx.fillRect(sx,hy,hw,hh);
+  cx.fillStyle='#D4C49C';cx.fillRect(sx+3,hy+3,hw-6,hh-3);
+  // 지붕
+  cx.fillStyle='#5A4A3A';cx.beginPath();cx.moveTo(sx-12,hy);cx.lineTo(sx+hw/2,hy-48);cx.lineTo(sx+hw+12,hy);cx.closePath();cx.fill();
+  cx.fillStyle='#4A3A2A';cx.beginPath();cx.moveTo(sx-12,hy-4);cx.lineTo(sx+hw/2,hy-52);cx.lineTo(sx+hw+12,hy-4);cx.closePath();cx.fill();
+  // 창문 2개
+  cx.fillStyle='#9CC8E6';cx.fillRect(sx+14,hy+18,32,26);cx.fillRect(sx+hw-46,hy+18,32,26);
+  cx.strokeStyle='#888';cx.lineWidth=1;
+  cx.strokeRect(sx+14,hy+18,32,26);cx.strokeRect(sx+hw-46,hy+18,32,26);
+  cx.beginPath();cx.moveTo(sx+30,hy+18);cx.lineTo(sx+30,hy+44);cx.stroke();
+  cx.beginPath();cx.moveTo(sx+hw-30,hy+18);cx.lineTo(sx+hw-30,hy+44);cx.stroke();
+  // 파란 대문
+  cx.fillStyle='#1565C0';cx.fillRect(sx+hw/2-16,hy+hh-50,32,50);
+  cx.fillStyle='#0D47A1';cx.fillRect(sx+hw/2-14,hy+hh-48,14,48);
+  cx.fillStyle='#FFD700';cx.beginPath();cx.arc(sx+hw/2+8,hy+hh-24,3,0,Math.PI*2);cx.fill();
+  // 담장
+  cx.fillStyle='#C8A878';cx.fillRect(sx-20,FL-32,20,32);cx.fillRect(sx+hw,FL-32,20,32);
+  cx.fillRect(sx-20,FL-36,hw+40,8);
+  // 강아지 집 표지판
+  cx.fillStyle='#FFF8E1';cx.fillRect(sx+hw/2-22,hy-18,44,16);
+  cx.strokeStyle='#aaa';cx.lineWidth=1;cx.strokeRect(sx+hw/2-22,hy-18,44,16);
+  cx.fillStyle='#555';cx.font='8px Courier New';cx.textAlign='center';
+  cx.fillText('🐶 ???네',sx+hw/2,hy-6);
+}
+
+function drawNPCs(){
+  // 공원 숨은그림찾기 제거됨
+  // 횡단보도 NPC
+  if(crossNPC&&!crossNPC.met){
+    const sx=crossNPC.x-cam;if(sx>-60&&sx<W+60){
+      cx.font='22px serif';cx.textAlign='center';cx.fillText('🚦',sx+11,FL-16);
+      drawBubble(sx-14,FL-52,76,'건너볼까?');
+    }
+  }
+  // 카페 NPC
+  if(cafeNPC&&!cafeNPC.met){
+    const sx=cafeNPC.x-cam;if(sx>-60&&sx<W+60){
+      cx.font='22px serif';cx.textAlign='center';cx.fillText('☕',sx+11,FL-16);
+      drawBubble(sx-14,FL-52,74,'멍푸치노!');
+    }
+  }
+  // 똘이 보너스 NPC
+  // 집 미션 NPC들
+  if(!houseMissionDone){
+    houseNPCs.forEach(h=>{
+      if(h.found)return;
+      const sx=h.x-cam;if(sx<-180||sx>W+180)return;
+      drawDollyHouse(sx,h.dogType);
+      if(!h.met&&Math.abs(PL.x-h.x)<150){
+        cx.fillStyle='rgba(255,215,0,0.95)';
+        cx.beginPath();cx.arc(PL.x-cam+18,PL.y-20,12,0,Math.PI*2);cx.fill();
+        cx.fillStyle='#111';cx.font='bold 14px Courier New';cx.textAlign='center';
+        cx.fillText('!',PL.x-cam+18,PL.y-15);
+      }
+    });
+  }
+  // 똘이 집 미션 목적지 표시
+  if(dollyNPC&&dollyNPC.missionActive&&!dollyNPC.done){
+    const sx=dollyNPC.destX-cam;
+    if(sx>-30&&sx<W+30){
+      fillR(sx-3,FL-100,6,100,'#555');
+      cx.fillStyle=Math.floor(frame/10)%2===0?'#ffb74d':'#ffd090';
+      cx.beginPath();cx.moveTo(sx+3,FL-100);cx.lineTo(sx+34,FL-85);cx.lineTo(sx+3,FL-70);cx.closePath();cx.fill();
+      cx.fillStyle='#fff';cx.font='bold 8px Courier New';cx.textAlign='left';cx.fillText('🏠',sx+8,FL-82);
+    }
+    const sec=Math.ceil(dollyNPC.timer/60);
+    fillR(W/2-40,H-42,80,24,'rgba(0,0,0,.7)');
+    cx.fillStyle=sec<=5?'#ff5252':'#ffb74d';cx.font='bold 13px Courier New';cx.textAlign='center';
+    cx.fillText(`⏱ ${sec}초`,W/2,H-24);
+  }
+}
+
+function drawTaxi(){
+  // 택시는 미니게임 패널에서 처리 (drawTaxiMini)
+}
+
+function drawBubble(x,y,w,txt){
+  cx.fillStyle='rgba(255,255,220,.92)';cx.fillRect(x,y,w,14);
+  cx.strokeStyle='#aaa';cx.lineWidth=1;cx.strokeRect(x,y,w,14);
+  cx.fillStyle='#444';cx.font='9px Courier New';cx.textAlign='left';cx.fillText(txt,x+3,y+11);
+}
+
+function drawChiwaFriend(){
+  if(!chiwaFriend.active)return;
+  const sx=chiwaFriend.x-cam;if(sx<-30||sx>W+30)return;
+  const bounce=chiwaFriend.wf<2?-2:0;
+  const fsp=DOG_F_SPRITES[ch1DogType]||CHIWA_F;
+  const fpal=DOG_F_PALS[ch1DogType]||CHIWA_PAL;
+  sprC(fsp,sx,FL-18+bounce,fpal);
+}
+
+function drawPlayer(){
+  const ppx=PL.x-cam,ppy=PL.y;
+  const blink=PL.inv>0&&Math.floor(PL.inv/7)%2===1;
+  const shining=hasInvincible&&Math.floor(frame/4)%2===0;
+
+  if(blink)cx.globalAlpha=0.35;
+  if(shining){cx.fillStyle='rgba(255,215,0,0.3)';cx.beginPath();cx.arc(ppx+18,ppy+21,28,0,Math.PI*2);cx.fill();}
+
+  cx.globalAlpha*=0.28;cx.fillStyle='#000';
+  cx.beginPath();cx.ellipse(ppx+18,FL+4,16,5,0,0,Math.PI*2);cx.fill();
+  cx.globalAlpha=blink?0.35:1;
+
+  // 꼬리
+  const tw=PL.ground&&Math.abs(PL.vx)>.5?Math.sin(PL.wf*Math.PI/2)*2:0;
+  [[-PS,9*PS],[-PS,8*PS],[-2*PS,7*PS],[-2*PS,6*PS],[-3*PS,5*PS+tw],[-2*PS,4*PS],[-PS,3*PS],[0,2*PS]].forEach(([dx,dy])=>{
+    cx.fillStyle='#F2F0E8';cx.fillRect(ppx+dx,ppy+dy,PS,PS);
+  });
+
+  cx.globalAlpha=blink?0.35:1;  // 스프라이트 그리기 전 알파 확실히
+  const sp=PL.ground&&Math.abs(PL.vx)>.5?(PL.wf<2?D_RUN1:D_RUN2):D_JMP;
+  spr(sp,ppx,ppy);
+  cx.globalAlpha=1;
+}
+
+function drawHUD(){
+  // 하트 - maxHearts에 맞게 배경 넓이 동적 조정
+  const heartBgW=14+maxHearts*34-14+20;
+  fillR(8,8,heartBgW,34,'rgba(0,0,0,.5)');
+  const totalSlots=maxHearts;
+  for(let i=0;i<totalSlots;i++){
+    const v=hearts-i,hx=14+i*34;
+    [[4,0,8,3],[2,3,12,3],[0,6,16,3],[0,9,16,3],[2,12,12,3],[4,15,8,3],[6,18,4,3]].forEach(([ox,oy,w2,h2])=>{
+      cx.fillStyle=v>=1?'#FF3850':v>=.5?(ox<8?'#FF3850':'#444'):'#333';
+      cx.fillRect(hx+ox,14+oy,w2,h2);
+    });
+  }
+
+  // 점수
+  fillR(W-218,8,110,34,'rgba(0,0,0,.5)');
+  cx.fillStyle='#FFD700';cx.font='bold 14px Courier New';cx.textAlign='right';
+  cx.fillText(String(score).padStart(6,'0'),W-114,30);
+
+  // PAUSE 버튼
+  const pb=pauseBtnRect;
+  fillR(pb.x,pb.y,pb.w,pb.h,'rgba(0,0,0,0.72)');
+  cx.strokeStyle='#FFD700';cx.lineWidth=2;cx.strokeRect(pb.x,pb.y,pb.w,pb.h);
+  cx.fillStyle='#FFD700';cx.font='bold 15px Courier New';cx.textAlign='center';
+  cx.fillText('❚❚',pb.x+pb.w/2,pb.y+17);
+  cx.fillStyle='rgba(255,215,0,0.75)';cx.font='bold 9px Courier New';
+  cx.fillText('PAUSE',pb.x+pb.w/2,pb.y+30);
+
+  // 가방 아이콘 (획득 후)
+  if(hasBag){
+    fillR(W-218,46,60,26,'rgba(0,0,0,.5)');
+    cx.font='14px serif';cx.textAlign='left';cx.fillText('🎒',W-216,66);
+    cx.fillStyle='#aaa';cx.font='9px Courier New';cx.textAlign='left';
+    cx.fillText(`B키`,W-198,66);
+    if(inventory.lifePotion>0){
+      cx.fillText('🧪'+inventory.lifePotion,W-180,66);
+    }
+  }
+
+  // 무적 표시
+  if(hasInvincible){
+    fillR(W/2-64,8,128,28,'rgba(0,0,0,.6)');
+    cx.fillStyle='#ffd700';cx.font='bold 11px Courier New';cx.textAlign='center';
+    cx.fillText(`🛡 무적 ${Math.ceil(invincibleTimer/60)}초`,W/2,27);
+  }
+  // 느려짐 표시
+  if(manholeSlowTimer>0){
+    const bar=manholeSlowTimer/60;
+    fillR(PL.x-cam,PL.y-8,Math.round(36*bar),4,'#4488ff');
+  }
+
+  // 인벤토리 패널
+  // 인벤토리는 OV 패널로 처리
+
+  // 진행바
+  const prog=Math.min(PL.x/WORLD,1);
+  fillR(8,H-18,W-16,10,'rgba(0,0,0,.5)');
+  fillR(8,H-18,(W-16)*prog,10,'#FFD700');
+
+  // 팝업
+  popups.forEach(p=>{
+    cx.globalAlpha=Math.min(1,p.life/20);
+    cx.fillStyle=p.c;cx.font='bold 12px Courier New';cx.textAlign='center';
+    cx.fillText(p.t,p.x-cam+18,p.y-6);cx.globalAlpha=1;
+  });
+
+  // 모바일 버튼
+  drawMobileButtons();
+}
+
+function drawMobileButtons(){
+  if(gs!=='playing'&&gs!=='paused')return;
+  [[MB.left,'◀',mobileKeys.left,'#ffd700'],[MB.right,'▶',mobileKeys.right,'#ffd700'],[MB.jump,'▲',mobileKeys.jump,'#69f0ae']].forEach(([btn,label,active,col])=>{
+    cx.globalAlpha=active?0.75:0.40;
+    fillR(btn.x,btn.y,btn.w,btn.h,'#000');
+    cx.strokeStyle=col;cx.lineWidth=2;cx.strokeRect(btn.x,btn.y,btn.w,btn.h);
+    cx.fillStyle=col;cx.font=`bold ${btn===MB.jump?26:24}px sans-serif`;cx.textAlign='center';
+    cx.fillText(label,btn.x+btn.w/2,btn.y+btn.h/2+9);
+    if(btn===MB.jump){cx.font='bold 9px Courier New';cx.fillStyle='rgba(105,240,174,0.8)';cx.fillText('JUMP',btn.x+btn.w/2,btn.y+btn.h-5);}
+    cx.globalAlpha=1;
+  });
+}
+
+function drawTitle(){
+  drawBG();
+  fillR(0,0,W,H,'rgba(0,0,0,.55)');
+  fillR(W/2-210,95,420,215,'#0e0e1e');
+  cx.strokeStyle='#ffd700';cx.lineWidth=3;cx.strokeRect(W/2-210,95,420,215);
+  cx.fillStyle='#FFD700';cx.font='bold 26px Courier New';cx.textAlign='center';
+  cx.fillText('🐾 조백호의 여행',W/2,138);
+  cx.fillStyle='#82b1ff';cx.font='16px Courier New';cx.fillText('2장: 시내 탐험',W/2,166);
+  cx.fillStyle='#aaa';cx.font='11px Courier New';
+  cx.fillText('🕳️ 맨홀 피하기  🍖 간식 받기',W/2,194);
+  cx.fillText('🚦 횡단보도  ☕ 카페  🚕 택시',W/2,214);
+  if(Math.floor(frame/22)%2===0){cx.fillStyle='#FFD700';cx.font='bold 12px Courier New';cx.fillText('[ SPACE / 클릭 → 게임 설명 ]',W/2,254);}
+  spr(D_RUN1,W/2-18,268);
+}
+
+// ── 메인 루프 ─────────────────────────────────
+function loop(){
+  requestAnimationFrame(loop);
+  cx.clearRect(0,0,W,H);
+  frame++;
+  if(gs==='title'){drawTitle();return;}
+  if(gs!=='playing'){
+    drawBG();drawManholes();drawSnacks();drawNPCs();drawTaxi();drawChiwaFriend();drawPlayer();drawHUD();return;
+  }
+  update();
+  checkDollyMission();
+  // 택시 이동 업데이트
+  updateTaxi();
+  drawBG();drawManholes();drawSnacks();drawNPCs();drawTaxi();drawChiwaFriend();drawPlayer();drawHUD();
+}
+
+OV.style.display='none';gs='title';loop();
+</script>
+</body>
+</html>

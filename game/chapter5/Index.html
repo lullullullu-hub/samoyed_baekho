@@ -1,0 +1,1740 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>조백호의 여행 - 5장: 바닷가 어촌마을</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:#0d0d1a;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;}
+#wrap{position:relative;width:100vw;max-height:100vh;}
+canvas{display:block;width:100%;height:auto;image-rendering:pixelated;cursor:pointer;}
+#ov{position:fixed;inset:0;background:rgba(0,0,0,0.82);display:none;align-items:center;justify-content:center;z-index:20;touch-action:auto;}
+.pnl{background:#0e0e1e;border:3px solid #ffd700;padding:clamp(10px,2vw,20px);max-width:min(96vw,900px);width:96%;text-align:center;color:#fff;font-family:'Courier New',monospace;max-height:92vh;overflow-y:auto;touch-action:auto;position:relative;z-index:30;}
+.pnl h2{color:#ffd700;font-size:clamp(22px,4vw,40px);margin-bottom:8px;}
+.pnl p{font-size:clamp(18px,2.5vw,26px);color:#bbb;line-height:1.8;margin-bottom:10px;}
+.btn{background:#ffd700;color:#111;border:none;padding:clamp(9px,1.4vw,18px) clamp(18px,2.7vw,32px);font-size:clamp(18px,2.8vw,32px);cursor:pointer;font-weight:700;margin:3px;font-family:'Courier New',monospace;}
+.btn:hover{background:#ffe94c;}
+.btn.g{background:#69f0ae;color:#111;}
+.btn.b{background:#82b1ff;color:#111;}
+.btn.r{background:#ff5252;color:#fff;}
+.btn.p{background:#ce93d8;color:#111;}
+.btn-row{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;}
+.tut-row{display:flex;align-items:center;gap:10px;margin:5px 0;text-align:left;}
+.tut-icon{font-size:clamp(18px,2.5vw,28px);width:clamp(24px,3vw,36px);flex-shrink:0;}
+.tut-text{font-size:clamp(16px,2.2vw,24px);color:#ccc;line-height:1.6;}
+.mg-title{color:#ffd700;font-size:clamp(20px,3.5vw,36px);}
+.mg-desc{color:#fff;font-size:clamp(16px,2.2vw,24px);}
+.mg-sub{color:#aaa;font-size:clamp(14px,1.8vw,20px);}
+.mg-hi{color:#ffd700;font-weight:bold;font-size:clamp(16px,2.2vw,24px);}
+</style>
+<script>
+// ══════════════════════════════════════════════════
+//  ChoBGM + ChoSFX — 바닷가 마을 오디오 엔진
+// ══════════════════════════════════════════════════
+const ChoAudio=(()=>{
+  let ctx=null,muted=false,masterGain=null;
+  function getCtx(){
+    if(!ctx){ctx=new(window.AudioContext||window.webkitAudioContext)();masterGain=ctx.createGain();masterGain.gain.value=0.7;masterGain.connect(ctx.destination);}
+    if(ctx.state==='suspended')ctx.resume();
+    return ctx;
+  }
+  function osc(freq,type,start,dur,vol,dest,attack=0.01,release=0.08){
+    const c=getCtx();if(muted)return;
+    const g=c.createGain();g.gain.setValueAtTime(0,start);g.gain.linearRampToValueAtTime(vol,start+attack);
+    g.gain.linearRampToValueAtTime(vol*0.6,start+dur*0.5);g.gain.linearRampToValueAtTime(0,start+dur);
+    g.connect(dest||masterGain);
+    const o=c.createOscillator();o.type=type;o.frequency.setValueAtTime(freq,start);o.connect(g);o.start(start);o.stop(start+dur+release);
+  }
+  function noise(start,dur,vol,lpFreq,dest){
+    const c=getCtx();if(muted)return;
+    const buf=c.createBuffer(1,c.sampleRate*dur,c.sampleRate);
+    const d=buf.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=(Math.random()*2-1);
+    const src=c.createBufferSource();src.buffer=buf;
+    const lp=c.createBiquadFilter();lp.type='lowpass';lp.frequency.value=lpFreq;
+    const g=c.createGain();g.gain.setValueAtTime(vol,start);g.gain.linearRampToValueAtTime(0,start+dur);
+    src.connect(lp);lp.connect(g);g.connect(dest||masterGain);src.start(start);
+  }
+  return{
+    getCtx,
+    toggleMute(){muted=!muted;if(masterGain)masterGain.gain.value=muted?0:0.7;return muted;},
+    isMuted(){return muted;},
+    get master(){return masterGain;},
+  };
+})();
+
+// ── BGM: 밝고 경쾌한 바닷가 마을 우쿨렐레풍 ──────
+const ChoBGM=(()=>{
+  let playing=false,stopFlag=false,loopTO=null;
+  // C장조 음계 주파수
+  const N={C4:261.6,D4:293.7,E4:329.6,F4:349.2,G4:392,A4:440,B4:493.9,
+            C5:523.3,D5:587.3,E5:659.3,G5:784,A5:880,
+            C3:130.8,G3:196,A3:220,F3:174.6,E3:164.8};
+  function playLoop(){
+    if(stopFlag){playing=false;return;}
+    const c=ChoAudio.getCtx();
+    const t=c.currentTime;
+    const bpm=112,beat=60/bpm,bar=beat*4;
+
+    // 멜로디 (우쿨렐레풍 밝은 선율)
+    const mel=[
+      [N.E5,0.8],[N.G5,0.5],[N.A5,0.8],[N.G5,0.5],
+      [N.E5,0.8],[N.C5,0.5],[N.D5,1.2],[0,0.4],
+      [N.D5,0.8],[N.F4,0.5],[N.G5,0.8],[N.E5,0.5],
+      [N.C5,0.8],[N.D5,0.5],[N.E5,1.8],[0,0.2],
+    ];
+    let mt=t;
+    mel.forEach(([f,dur])=>{
+      if(f>0)osc5(f,'sine',mt,dur*beat*0.85,0.18);
+      mt+=dur*beat;
+    });
+
+    // 코드 (우쿨렐레 스트럼 느낌)
+    const chords=[
+      [[N.C3,N.E4,N.G4],0],[[[N.C3,N.E4,N.G4]],1],
+      [[N.F3,N.A3,N.C4],2],[[[N.G3,N.B4,N.D5]],3],
+    ];
+    for(let b=0;b<4;b++){
+      const base=b<2?[N.C3,N.E4,N.G4]:b===2?[N.F3,N.A3,N.C4]:[N.G3,N.B4,N.D5];
+      base.forEach((f,i)=>{
+        if(f>0)osc5(f,'triangle',t+b*bar+i*0.04,bar*0.65,0.09);
+      });
+      // 업스트럼 (off-beat)
+      base.forEach((f,i)=>{
+        if(f>0)osc5(f*1.5,'triangle',t+b*bar+beat*0.5+i*0.03,beat*0.35,0.05);
+      });
+    }
+
+    // 베이스라인
+    const bass=[[N.C3,0],[N.C3,1],[N.F3,2],[N.G3,3]];
+    bass.forEach(([f,b])=>{
+      osc5(f/2,'triangle',t+b*bar,beat*0.9,0.22,null,0.02,0.15);
+      osc5(f/2,'triangle',t+b*bar+beat*2,beat*0.7,0.16,null,0.02,0.12);
+    });
+
+    // 퍼커션 (파도 느낌)
+    for(let b=0;b<4;b++){
+      noise5(t+b*bar,beat*0.25,0.06,300);       // 비트 1
+      noise5(t+b*bar+beat*2,beat*0.25,0.05,300); // 비트 3
+      noise5(t+b*bar+beat,beat*0.12,0.03,800);   // 오프비트 하이햇
+      noise5(t+b*bar+beat*3,beat*0.12,0.03,800);
+    }
+
+    const loopDur=bar*4;
+    loopTO=setTimeout(playLoop,(loopDur-0.05)*1000);
+  }
+
+  function osc5(f,type,start,dur,vol,dest,atk=0.015,rel=0.1){
+    if(stopFlag)return;
+    const c=ChoAudio.getCtx();if(ChoAudio.isMuted())return;
+    const g=c.createGain();
+    g.gain.setValueAtTime(0,start);g.gain.linearRampToValueAtTime(vol,start+atk);
+    g.gain.linearRampToValueAtTime(vol*0.5,start+dur*0.6);g.gain.linearRampToValueAtTime(0,start+dur);
+    g.connect(ChoAudio.master||c.destination);
+    const o=c.createOscillator();o.type=type;o.frequency.value=f;o.connect(g);o.start(start);o.stop(start+dur+rel);
+  }
+  function noise5(start,dur,vol,lpF){
+    if(stopFlag)return;
+    const c=ChoAudio.getCtx();if(ChoAudio.isMuted())return;
+    const buf=c.createBuffer(1,Math.ceil(c.sampleRate*dur),c.sampleRate);
+    const d=buf.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=(Math.random()*2-1);
+    const src=c.createBufferSource();src.buffer=buf;
+    const lp=c.createBiquadFilter();lp.type='lowpass';lp.frequency.value=lpF;
+    const g=c.createGain();g.gain.setValueAtTime(vol,start);g.gain.linearRampToValueAtTime(0,start+dur);
+    src.connect(lp);lp.connect(g);g.connect(ChoAudio.master||c.destination);src.start(start);
+  }
+
+  return{
+    play(ch){
+      if(playing)return;
+      stopFlag=false;playing=true;
+      ChoAudio.getCtx();
+      playLoop();
+    },
+    stop(){
+      stopFlag=true;playing=false;
+      if(loopTO)clearTimeout(loopTO);
+    },
+    pause(){stopFlag=true;playing=false;if(loopTO)clearTimeout(loopTO);},
+    resume(){if(!playing){stopFlag=false;playing=true;playLoop();}},
+  };
+})();
+
+// ── SFX ───────────────────────────────────────────
+const ChoSFX=(()=>{
+  function play(fn){ChoAudio.getCtx();if(ChoAudio.isMuted())return;fn();}
+  function o(f,type,dur,vol,t0,dest){
+    const c=ChoAudio.getCtx();const t=t0||c.currentTime;
+    const g=c.createGain();g.gain.setValueAtTime(vol,t);g.gain.exponentialRampToValueAtTime(0.001,t+dur);
+    g.connect(dest||ChoAudio.master||c.destination);
+    const osc=c.createOscillator();osc.type=type;osc.frequency.value=f;osc.connect(g);osc.start(t);osc.stop(t+dur+0.05);
+  }
+  function n(dur,vol,lpF,t0){
+    const c=ChoAudio.getCtx();const t=t0||c.currentTime;
+    const buf=c.createBuffer(1,Math.ceil(c.sampleRate*dur),c.sampleRate);
+    const d=buf.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=(Math.random()*2-1);
+    const src=c.createBufferSource();src.buffer=buf;
+    const lp=c.createBiquadFilter();lp.type='lowpass';lp.frequency.value=lpF;
+    const g=c.createGain();g.gain.setValueAtTime(vol,t);g.gain.exponentialRampToValueAtTime(0.001,t+dur);
+    src.connect(lp);lp.connect(g);g.connect(ChoAudio.master||c.destination);src.start(t);
+  }
+  return{
+    // 점프: 톡! 경쾌한 팝
+    jump(){play(()=>{const c=ChoAudio.getCtx(),t=c.currentTime;o(520,'sine',0.12,0.22,t);o(780,'sine',0.08,0.12,t+0.04);});},
+    // 아이템 획득: 밝은 딩동
+    item(){play(()=>{const c=ChoAudio.getCtx(),t=c.currentTime;o(880,'sine',0.1,0.18,t);o(1100,'sine',0.1,0.15,t+0.08);o(1320,'sine',0.12,0.2,t+0.15);});},
+    // NPC 만남: 따뜻한 2음 차임
+    npc(){play(()=>{const c=ChoAudio.getCtx(),t=c.currentTime;o(523,'triangle',0.2,0.14,t);o(659,'triangle',0.22,0.14,t+0.14);});},
+    // 미니게임 성공: 상승 팡파레
+    win(){play(()=>{const c=ChoAudio.getCtx(),t=c.currentTime;[523,659,784,1047].forEach((f,i)=>{o(f,'square',0.18,0.12,t+i*0.1);});});},
+    // 미니게임 실패: 하강 2음
+    fail(){play(()=>{const c=ChoAudio.getCtx(),t=c.currentTime;o(440,'sawtooth',0.15,0.18,t);o(294,'sawtooth',0.18,0.18,t+0.12);});},
+    // 피격: 둔탁한 쿵
+    hit(){play(()=>{const c=ChoAudio.getCtx(),t=c.currentTime;n(0.18,0.3,200,t);o(120,'sine',0.15,0.2,t);});},
+    // 꽃게 피격: 짧은 buzz (집게 소리)
+    crabHit(){play(()=>{const c=ChoAudio.getCtx(),t=c.currentTime;o(180,'sawtooth',0.12,0.25,t);o(240,'square',0.08,0.1,t+0.04);});},
+    // 게 빗나감: 퍽
+    miss(){play(()=>{const c=ChoAudio.getCtx(),t=c.currentTime;n(0.1,0.15,400,t);o(200,'sine',0.08,0.12,t);});},
+  };
+})();
+</script>
+</head>
+<body>
+<div id="wrap">
+  <canvas id="c" width="800" height="416"></canvas>
+  <div id="ov"><div class="pnl" id="pnl"></div></div>
+</div>
+<script>
+const CV=document.getElementById('c'),cx=CV.getContext('2d');
+cx.imageSmoothingEnabled=false;
+const OV=document.getElementById('ov'),PNL=document.getElementById('pnl');
+const W=800,H=416,FL=355,PS=3,WORLD=5200;
+
+const PAL={'.':null,'W':'#FFFFFF','w':'#F2F0E8','L':'#D0D0C0','B':'#000000','b':'#222222',
+  'P':'#FFB8C8','p':'#E07090','G':'#5A8A3A','g':'#3A6A20','R':'#888880','r':'#666660',
+  'K':'#C8B890','k':'#A89870','T':'#4A3020','t':'#2A1810','F':'#FFB7C5','f':'#FF85A0',
+  'H':'#F2C06A','h':'#C89040','Y':'#FFD020','y':'#B09000','N':'#8B6914','n':'#5A4008',
+  'Z':'#484848','z':'#2A2A2A','S':'#C07030','s':'#A05020',
+  'E':'#228844','e':'#116622','I':'#88CCFF','i':'#4499CC',
+  'X':'#A0C8E0','x':'#608090','O':'#F0A840','o':'#C88020',
+  'C':'#4488AA','c':'#2A6088','A':'#E8F0F8','a':'#C0D0E0',
+  'U':'#F0C8A0','u':'#C8A080','V':'#CC6644','v':'#AA4422',
+  'Q':'#88AACC','q':'#4488BB',
+};
+function spr(data,sx,sy,flip){
+  const cols=data[0].length;
+  data.forEach((row,ry)=>[...row].forEach((c,rx)=>{
+    if(!PAL[c])return;
+    const dx=flip?sx+(cols-1-rx)*PS:sx+rx*PS;
+    cx.fillStyle=PAL[c];cx.fillRect(dx,sy+ry*PS,PS,PS);
+  }));
+}
+function fillR(x,y,w,h,col){cx.fillStyle=col;cx.fillRect(x,y,w,h);}
+
+// ── 스프라이트 ──────────────────────────────────
+const D_RUN1=['..PPWWWWPP..','.WWWWWWWWWWW','WWWWWWWWWWWW','W.BB.WW.BB.W','WWWWWWWWWWWW','WWWWLLLLWWWW','WWWWLBBLwwww','WWWWWWWWWWWW','.WWWWWWWWWWW','.WWWWWWWWWWW','.WWWWWWWWWWW','..WWWWWWWWWW','..WW.WW.WW..','..WW.WW.WW..'];
+const D_RUN2=['..PPWWWWPP..','.WWWWWWWWWWW','WWWWWWWWWWWW','W.BB.WW.BB.W','WWWWWWWWWWWW','WWWWLLLLWWWW','WWWWLBBLwwww','WWWWWWWWWWWW','.WWWWWWWWWWW','.WWWWWWWWWWW','.WWWWWWWWWWW','..WWWWWWWWWW','...WW.WW.WW.','...WW.WW.WW.'];
+const D_JMP=['..PPWWWWPP..','.WWWWWWWWWWW','WWWWWWWWWWWW','W.BB.WW.BB.W','WWWWWWWWWWWW','WWWWLLLLWWWW','WWWWLBBLwwww','WWWWWWWWWWWW','.WWWWWWWWWWW','..WWWWWWWWWW','..WWWWWWWWWW','.WW.WWWWWWWW','WW....WWWWWW','............'];
+const ROCK_SPR=['...ZZZZZZZ..','..ZzzzzzZZ..','.ZzzZZZzzzZ.','ZzzZZZZZzzZZ','ZzZZZZZZzZZZ','ZZZZZZZZZZzZ','.ZZZZZZZZZZ.','..ZZZZZZZZ..'];
+const JINDO_PAL={'D':'#D4A058','d':'#B08040','e':'#7A5010','B':'#000000','n':'#333333','.':null};
+const JINDO_RUN1=['....DD......','...DdD......','..DD.DDDDDD.','.DD..DDDDDDd','DdD..DDDDDDD','D.B..DDnDDDD','DDDD.DDDDDDD','.DDDDDDDDDDD','..DDDDDDDDD.','..DD....DDDD','..DD....DD..','.eeD....Dee.','.ee......ee.','............'];
+const JINDO_RUN2=['....DD......','...DdD......','..DD.DDDDDD.','.DD..DDDDDDd','DdD..DDDDDDD','D.B..DDnDDDD','DDDD.DDDDDDD','.DDDDDDDDDDD','..DDDDDDDDD.','..DDDD..DDDD','...DD...DD..','..eeD...Dee.','..ee.....ee.','............'];
+function sprJindo(data,sx,sy,flip){
+  const cols=data[0].length;
+  data.forEach((row,ry)=>[...row].forEach((c,rx)=>{
+    if(!JINDO_PAL[c])return;
+    const dx=flip?sx+(cols-1-rx)*PS:sx+rx*PS;
+    cx.fillStyle=JINDO_PAL[c];cx.fillRect(dx,sy+ry*PS,PS,PS);
+  }));
+}
+
+// ── 지형: 어촌마을 — 평탄한 콘크리트 느낌 ──────
+function getGroundY(worldX){
+  const base=FL;
+  const h1=Math.sin(worldX*0.0014)*10;
+  const h2=Math.sin(worldX*0.0048+0.7)*5;
+  return base+h1+h2;
+}
+
+// ── 전역 상태 ────────────────────────────────────
+let gs='title',frame=0,cam=0,camMin=0,hearts=5,maxHearts=5,score=0;
+let rocks=[],seagulls=[],popups=[];
+let rockSlowTimer=0;
+// 꽃게 장애물
+let crabObstacles=[];
+let crabStunTimer=0; // 2초(120프레임) 동안 점프 불가
+let inventory={lifePotion:0,shield:0,items:[],catAbility:false,birdAbility:false};
+let hasInvincible=false,invincibleTimer=0;
+let hasBag=true;
+const pauseBtnRect={x:W-60,y:6,w:52,h:36};
+const MB={left:{x:14,y:H-80,w:64,h:60},right:{x:84,y:H-80,w:64,h:60},jump:{x:W-100,y:H-86,w:88,h:72}};
+function inBtn(btn,tx,ty){return tx>=btn.x&&tx<=btn.x+btn.w&&ty>=btn.y&&ty<=btn.y+btn.h;}
+
+let ch4Save={};
+let strayDogName='',strayDogHas=false;
+
+// NPC
+let firstHouseNPC=null,crabHalmeoniNPC=null,sudokuNPC=null,netNPC=null,harborNPC=null;
+let firstHouseDone=false,crabDone=false,sudokuDone=false,netDone=false;
+let dogAdopted=false; // 들개 입양됨
+
+let crabCaught=0,crabMissed=0; // 게잡기 전역 카운터
+
+const PL={x:120,y:FL-42,vy:0,vx:0,w:36,h:42,ground:false,wf:0,wt:0,inv:0,dj:false,catAb:false,birdAb:false};
+const JUMP_V=-10.0,GRAV=0.52,SPD=4.0;
+
+// 마을 집 데이터 (픽셀 아트용)
+const VILLAGE_HOUSES=[
+  {x:300, w:90, h:80, roof:'#2255CC', wall:'#F0EDE0', door:'#8B4513', hasGarden:true},
+  {x:550, w:80, h:70, roof:'#1A4ABB', wall:'#EEEAE0', door:'#6B3410', hasGarden:false},
+  {x:850, w:100, h:85, roof:'#2060DD', wall:'#F2EFE2', door:'#7A3A10', hasGarden:true},
+  {x:1150,w:75, h:65, roof:'#1E50C0', wall:'#EDEAE0', door:'#8B4513', hasGarden:false},
+  {x:1500,w:95, h:80, roof:'#2255CC', wall:'#F0EDE0', door:'#7A3A10', hasGarden:true},
+  {x:1800,w:80, h:72, roof:'#1A4ABB', wall:'#EDE8DC', door:'#6B3410', hasGarden:false},
+  {x:2100,w:88, h:78, roof:'#2060DD', wall:'#F2EEE0', door:'#8B4513', hasGarden:true},
+  {x:2500,w:92, h:82, roof:'#1E50C0', wall:'#EEEAE0', door:'#7A3A10', hasGarden:false},
+  {x:2900,w:85, h:75, roof:'#2255CC', wall:'#F0EDE0', door:'#8B4513', hasGarden:true},
+  {x:3300,w:78, h:68, roof:'#1A4ABB', wall:'#EDE8DC', door:'#6B3410', hasGarden:false},
+  {x:3700,w:96, h:84, roof:'#2060DD', wall:'#F2EEE0', door:'#7A3A10', hasGarden:true},
+  {x:4100,w:82, h:72, roof:'#1E50C0', wall:'#EEEAE0', door:'#8B4513', hasGarden:false},
+  {x:4500,w:110,h:90, roof:'#1A3A99', wall:'#F0EDE0', door:'#5A2A08', hasGarden:true}, // 항구 근처 큰 집
+];
+
+function initGame(){
+  try{ch4Save=JSON.parse(localStorage.getItem('ch4_save')||'{}');}catch(e){ch4Save={};}
+  strayDogHas=!!(ch4Save.strayDog);
+  strayDogName=ch4Save.strayDogName||'개돌이';
+
+  const items=(ch4Save.items||[]).filter(it=>!it.ch3only);
+  inventory={
+    lifePotion:ch4Save.lifePotion||0,
+    shield:ch4Save.shield||0,
+    items,
+    catAbility:!!(ch4Save.catAbility),
+    birdAbility:!!(ch4Save.birdAbility),
+  };
+  maxHearts=ch4Save.maxHearts||5;
+  hearts=Math.min(ch4Save.hearts||5,maxHearts);
+  Object.assign(PL,{x:120,y:FL-42,vy:0,vx:0,ground:false,wf:0,wt:0,inv:0,dj:false,
+    catAb:!!(ch4Save.catEquipped||ch4Save.catAbility),
+    birdAb:!!(ch4Save.birdEquipped)});
+  score=0;cam=0;camMin=0;frame=0;popups=[];rockSlowTimer=0;
+  hasInvincible=false;invincibleTimer=0;crabStunTimer=0;
+  // 꽃게 장애물 (집 근처 아닌 위치에 듬성듬성)
+  crabObstacles=[];
+  const crabPositions=[700,1000,1650,2050,2700,3100,3800,4300];
+  crabPositions.forEach(cx2=>{
+    const nearHouse=VILLAGE_HOUSES.some(h=>Math.abs(h.x-cx2)<130);
+    if(!nearHouse)crabObstacles.push({x:cx2,used:false,dir:1,phase:Math.random()*Math.PI*2});
+  });
+
+  strayDogCompanion={active:strayDogHas,x:PL.x-80,wf:0,wt:0,name:strayDogName};
+  dogAdopted=false;
+
+  seagulls=Array.from({length:7},()=>({
+    x:Math.random()*W,y:20+Math.random()*100,
+    vx:0.5+Math.random()*1.0,wb:Math.random()*Math.PI*2,
+    wingDir:1,wingAngle:0,
+  }));
+
+  rocks=[];let rx=600;
+  while(rx<WORLD-600){
+    rx+=220+Math.floor(Math.random()*260);
+    // 집 근처엔 바위 없게
+    const nearHouse=VILLAGE_HOUSES.some(h=>Math.abs(h.x-rx)<120);
+    if(!nearHouse)rocks.push({x:rx,used:false});
+  }
+
+  firstHouseNPC={x:320,met:false};
+  crabHalmeoniNPC={x:1300,met:false};
+  sudokuNPC={x:2400,met:false};
+  netNPC={x:3500,met:false};
+  harborNPC={x:WORLD-400,met:false};
+
+  firstHouseDone=false;crabDone=false;sudokuDone=false;netDone=false;
+}
+
+const keys={},mobileKeys={left:false,right:false,jump:false};
+document.addEventListener('keydown',e=>{
+  keys[e.code]=true;
+  ['Space','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.code)&&e.preventDefault();
+  if(gs==='title'&&(e.code==='Space'||e.code==='Enter'))showTutorial();
+  else if(gs==='howto'&&(e.code==='Space'||e.code==='Enter'))nextTut();
+  else if(gs==='playing'){
+    if(e.code==='Space'||e.code==='ArrowUp')doJump();
+    if(e.code==='KeyP')togglePause();
+    if(e.code==='KeyB')toggleInv();
+  }
+  else if(gs==='paused'&&e.code==='KeyP')togglePause();
+  else if(gs==='inv'&&e.code==='KeyB')toggleInv();
+});
+document.addEventListener('keyup',e=>{keys[e.code]=false;});
+CV.addEventListener('click',e=>{
+  const r=CV.getBoundingClientRect();
+  const tx=(e.clientX-r.left)*(W/r.width),ty=(e.clientY-r.top)*(H/r.height);
+  if(gs==='title'){showTutorial();return;}
+  if(gs==='howto'){nextTut();return;}
+  if(gs==='playing'){
+    // 음소거 버튼 (W-122~W-74, y:8~42)
+    if(tx>=W-122&&tx<=W-74&&ty>=8&&ty<=42){ChoAudio.toggleMute();return;}
+    if(inBtn(pauseBtnRect,tx,ty)){togglePause();return;}
+    if(tx>W*.35)doJump();
+  }
+});
+CV.addEventListener('touchstart',e=>{
+  if(OV.style.display==='flex')return; // OV 열려있으면 캔버스 터치 무시
+  e.preventDefault();
+  const r=CV.getBoundingClientRect();const t0=e.changedTouches[0];
+  const tx=(t0.clientX-r.left)*(W/r.width),ty=(t0.clientY-r.top)*(H/r.height);
+  if(gs==='title'){showTutorial();return;}
+  if(gs==='howto'){nextTut();return;}
+  if(gs==='playing'){if(inBtn(pauseBtnRect,tx,ty)){togglePause();return;}updateMobileKeys(e);}
+},{passive:false});
+CV.addEventListener('touchmove',e=>{
+  if(OV.style.display==='flex')return;
+  e.preventDefault();if(gs==='playing')updateMobileKeys(e);
+},{passive:false});
+CV.addEventListener('touchend',e=>{
+  if(OV.style.display==='flex')return;
+  e.preventDefault();
+  if(gs==='playing'){const pts=getTouches(e);mobileKeys.left=pts.some(p=>inBtn(MB.left,p.x,p.y));mobileKeys.right=pts.some(p=>inBtn(MB.right,p.x,p.y));mobileKeys.jump=pts.some(p=>inBtn(MB.jump,p.x,p.y));}
+},{passive:false});
+function getTouches(e){const r=CV.getBoundingClientRect();return Array.from(e.touches).map(t=>({x:(t.clientX-r.left)*(W/r.width),y:(t.clientY-r.top)*(H/r.height)}));}
+function updateMobileKeys(e){const pts=getTouches(e);mobileKeys.left=pts.some(p=>inBtn(MB.left,p.x,p.y));mobileKeys.right=pts.some(p=>inBtn(MB.right,p.x,p.y));const jn=pts.some(p=>inBtn(MB.jump,p.x,p.y));if(jn&&!mobileKeys.jump)doJump();mobileKeys.jump=jn;}
+function doJump(){
+  if(crabStunTimer>0)return;
+  if(PL.birdAb){PL.vy=Math.max(-20,PL.vy-7);PL.ground=false;PL.dj=false;ChoSFX.jump();}
+  else if(PL.ground){PL.vy=JUMP_V;PL.ground=false;PL.dj=false;ChoSFX.jump();}
+  else if(PL.catAb&&!PL.dj){PL.vy=JUMP_V*.85;PL.dj=true;ChoSFX.jump();}
+}
+
+function update(){
+  if(gs!=='playing')return;
+  const curMax=rockSlowTimer>0?SPD*0.35:SPD;
+  const goingLeft=keys['ArrowLeft']||keys['KeyA']||mobileKeys.left;
+  const goingRight=keys['ArrowRight']||keys['KeyD']||mobileKeys.right;
+  if(goingLeft)PL.vx=Math.max(PL.vx-.7,-curMax*.45);
+  else if(goingRight)PL.vx=Math.min(PL.vx+.9,curMax);
+  else{
+    // 자동 전진: 아무 키도 안 누르면 천천히 앞으로
+    PL.vx=PL.vx*.74;
+    if(PL.vx<0.6)PL.vx=0.6; // 최소 전진 속도
+  }
+  if(PL.vx>curMax)PL.vx=curMax;
+  // 뒤로가기 완전 차단: vx가 음수가 되지 않도록
+  if(PL.vx<0)PL.vx=0;
+  PL.vy+=GRAV;PL.x+=PL.vx;PL.y+=PL.vy;
+  const fy=getGroundY(PL.x+18)-PL.h;
+  if(PL.y>=fy){PL.y=fy;PL.vy=0;PL.ground=true;PL.dj=false;}else PL.ground=false;
+  if(PL.y<8)PL.y=8;
+  const curGY=getGroundY(PL.x+18)-PL.h;
+  if(PL.y>curGY&&PL.vy>=0){PL.y=curGY;PL.vy=0;PL.ground=true;PL.dj=false;}
+  cam=Math.max(camMin,Math.min(PL.x-W*.32,WORLD-W));
+  // 뒤로가기 방지: 카메라 역행 금지
+  if(cam>camMin)camMin=cam;
+  PL.x=Math.max(cam+40,PL.x);
+  if(PL.ground&&Math.abs(PL.vx)>.5){PL.wt++;if(PL.wt>6){PL.wt=0;PL.wf=(PL.wf+1)%4;}}
+  if(PL.inv>0)PL.inv--;if(rockSlowTimer>0)rockSlowTimer--;
+  if(crabStunTimer>0)crabStunTimer--;
+  if(invincibleTimer>0){invincibleTimer--;if(invincibleTimer===0)hasInvincible=false;}
+
+  // 꽃게 장애물 이동 및 충돌
+  crabObstacles.forEach(cr=>{
+    if(cr.used)return;
+    cr.phase+=0.04;
+    cr.x+=Math.sin(cr.phase*0.5)*0.6*cr.dir; // 좌우 왔다갔다
+    const sx=cr.x-cam;
+    if(PL.inv===0&&!hasInvincible){
+      const crY=getGroundY(cr.x);
+      if(PL.x-cam+PL.w-8>sx+2&&PL.x-cam+8<sx+28&&PL.y+PL.h>crY-20&&PL.y<crY){
+        cr.used=true;hearts=Math.max(0,hearts-1);PL.inv=80;
+        crabStunTimer=120;ChoSFX.crabHit();
+        popups.push({x:PL.x,y:PL.y,t:'-1 🦀 점프불가!',c:'#FF6644',life:80});
+        if(hearts<=0){gs='over';showPanel('over');}
+      }
+    }
+  });
+
+  // 들개 동행 (입양 전까지만)
+  if(strayDogCompanion.active){
+    const stx=PL.x-80;strayDogCompanion.x+=(stx-strayDogCompanion.x)*.12;
+    strayDogCompanion.wt=(strayDogCompanion.wt||0)+1;
+    if(strayDogCompanion.wt>7){strayDogCompanion.wt=0;strayDogCompanion.wf=(strayDogCompanion.wf+1)%4;}
+  }
+
+  seagulls.forEach(s=>{
+    s.x+=s.vx;s.wb+=0.04;s.y+=Math.sin(s.wb)*0.4;
+    s.wingAngle+=0.14*s.wingDir;if(Math.abs(s.wingAngle)>0.5)s.wingDir*=-1;
+    if(s.x>W+30){s.x=-10;s.y=15+Math.random()*100;}
+  });
+
+  if(PL.inv===0&&!hasInvincible){
+    for(const r of rocks){
+      if(r.used)continue;
+      const sx=r.x-cam;
+      const rColY=getGroundY(r.x);
+      if(PL.x-cam+PL.w-8>sx+4&&PL.x-cam+8<sx+32&&PL.y+PL.h>rColY-20&&PL.y<rColY){
+        r.used=true;hearts=Math.max(0,hearts-1);PL.inv=80;rockSlowTimer=120;
+        ChoSFX.hit();
+        popups.push({x:PL.x,y:PL.y,t:'-1 🪨',c:'#ff5252',life:70});
+        if(hearts<=0){gs='over';showPanel('over');}
+      }
+    }
+  }
+
+  if(firstHouseNPC&&!firstHouseNPC.met&&PL.x>firstHouseNPC.x-80){firstHouseNPC.met=true;ChoSFX.npc();ChoBGM.pause();showFirstHouseEvent();}
+  if(crabHalmeoniNPC&&!crabHalmeoniNPC.met&&PL.x>crabHalmeoniNPC.x-80){crabHalmeoniNPC.met=true;ChoSFX.npc();ChoBGM.pause();showCrabIntro();}
+  if(sudokuNPC&&!sudokuNPC.met&&PL.x>sudokuNPC.x-80){sudokuNPC.met=true;ChoSFX.npc();ChoBGM.pause();showSudokuIntro();}
+  if(netNPC&&!netNPC.met&&PL.x>netNPC.x-80){netNPC.met=true;ChoSFX.npc();ChoBGM.pause();showNetIntro();}
+  if(harborNPC&&!harborNPC.met&&PL.x>harborNPC.x-200){harborNPC.met=true;ChoSFX.npc();ChoBGM.stop();showHarborEnd();}
+
+  popups=popups.filter(p=>{p.life--;p.y-=.5;return p.life>0;});
+}
+
+// ══ 배경 — 어촌마을 ══════════════════════════════
+function drawBG(){
+  // 하늘 — 맑은 낮, 약간 구름 낀
+  const sky=cx.createLinearGradient(0,0,0,H*.4);
+  sky.addColorStop(0,'#5AACE0');sky.addColorStop(.6,'#8ECCED');sky.addColorStop(1,'#B8DFF0');
+  cx.fillStyle=sky;cx.fillRect(0,0,W,H*.4);
+
+  // 구름
+  const co=cam*0.12;
+  [[100,30,36],[320,20,26],[580,36,32],[720,22,22],[950,28,30],[1200,18,20]].forEach(([bx,by,r])=>{
+    const cx2=(bx-co%1400+1400)%1400;
+    if(cx2<-80||cx2>W+80)return;
+    cx.fillStyle='rgba(255,255,255,0.9)';
+    cx.beginPath();cx.arc(cx2,by,r,0,Math.PI*2);cx.fill();
+    cx.beginPath();cx.arc(cx2-r*.7,by+r*.35,r*.7,0,Math.PI*2);cx.fill();
+    cx.beginPath();cx.arc(cx2+r*.7,by+r*.3,r*.65,0,Math.PI*2);cx.fill();
+  });
+
+  // 수평선 & 바다 — 화면 상단 20% 정도만 살짝 보임
+  const horizonY=H*0.38;
+  const seaGrd=cx.createLinearGradient(0,horizonY,0,horizonY+40);
+  seaGrd.addColorStop(0,'#2888BB');seaGrd.addColorStop(1,'#1A6A9A');
+  cx.fillStyle=seaGrd;cx.fillRect(0,horizonY,W,40);
+  // 수평선 위 반짝임
+  cx.strokeStyle='rgba(180,230,255,0.35)';cx.lineWidth=2;
+  cx.beginPath();cx.moveTo(0,horizonY+4);
+  for(let x=0;x<=W;x+=10)cx.lineTo(x,horizonY+4+Math.sin(x*0.03+frame*0.04)*2);
+  cx.stroke();
+
+  // 원거리 산/언덕 실루엣 (마을 뒤편)
+  const midO=cam*0.22;
+  cx.fillStyle='rgba(100,140,120,0.55)';
+  cx.beginPath();cx.moveTo(0,H*0.52);
+  for(let x=0;x<=W+40;x+=14){const wx=x+midO;cx.lineTo(x,H*0.52+Math.sin(wx*0.006)*18+Math.cos(wx*0.011)*9);}
+  cx.lineTo(W,H);cx.lineTo(0,H);cx.closePath();cx.fill();
+
+  // 마을 가로등 (패럴랙스 0.65)
+  const lpo=cam*0.65;
+  for(let lx=200;lx<WORLD;lx+=280){
+    const sx=lx-lpo;if(sx<-10||sx>W+10)continue;
+    const gy=getGroundY(lx);
+    fillR(sx+4,gy-55,5,55,'#808890'); // 기둥
+    fillR(sx,gy-58,14,5,'#707880'); // 팔
+    cx.fillStyle='rgba(255,240,180,0.7)';cx.beginPath();cx.arc(sx+7,gy-60,7,0,Math.PI*2);cx.fill();
+    cx.fillStyle='rgba(255,240,180,0.15)';cx.beginPath();cx.arc(sx+7,gy-60,16,0,Math.PI*2);cx.fill();
+  }
+
+  // 집들 그리기 (마을 핵심!)
+  VILLAGE_HOUSES.forEach(h=>{
+    const sx=h.x-cam;if(sx<-160||sx>W+160)return;
+    const gy=getGroundY(h.x+h.w/2);
+    const hx=sx,hy=gy-h.h;
+    // 집 본체 (흰벽)
+    fillR(hx,hy,h.w,h.h,h.wall);
+    // 집 테두리
+    cx.strokeStyle='#C8C4B0';cx.lineWidth=1.5;cx.strokeRect(hx,hy,h.w,h.h);
+    // 파란 지붕 (삼각형)
+    cx.fillStyle=h.roof;
+    cx.beginPath();cx.moveTo(hx-6,hy);cx.lineTo(hx+h.w/2,hy-28);cx.lineTo(hx+h.w+6,hy);cx.closePath();cx.fill();
+    cx.strokeStyle='rgba(0,0,60,0.3)';cx.lineWidth=1;
+    cx.beginPath();cx.moveTo(hx-6,hy);cx.lineTo(hx+h.w/2,hy-28);cx.lineTo(hx+h.w+6,hy);cx.closePath();cx.stroke();
+    // 굴뚝
+    fillR(hx+h.w*.65,hy-38,10,18,'#B08060');
+    fillR(hx+h.w*.63,hy-40,14,5,'#9A6A40');
+    // 연기 (가끔)
+    if(Math.floor(h.x/50)%3===0){
+      for(let si=0;si<3;si++){
+        const sp=(frame*0.015+si*0.7)%1;
+        const sox=hx+h.w*.7+Math.sin(sp*6)*3;const soy=hy-40-sp*22;
+        cx.fillStyle='rgba(200,200,200,'+(0.3-sp*0.25)+')';
+        cx.beginPath();cx.arc(sox,soy,3+sp*4,0,Math.PI*2);cx.fill();
+      }
+    }
+    // 창문 (파란 틀)
+    const winW=Math.floor(h.w*0.22),winH=Math.floor(h.h*0.24);
+    [[hx+h.w*.18,hy+h.h*.22],[hx+h.w*.58,hy+h.h*.22]].forEach(([wx,wy])=>{
+      fillR(wx,wy,winW,winH,'#9CC8E8');
+      cx.strokeStyle=h.roof;cx.lineWidth=2;cx.strokeRect(wx,wy,winW,winH);
+      fillR(wx+winW/2-0.5,wy,1,winH,'rgba(0,0,60,0.3)');
+      fillR(wx,wy+winH/2-0.5,winW,1,'rgba(0,0,60,0.3)');
+    });
+    // 문
+    const dw=Math.floor(h.w*0.18),dh=Math.floor(h.h*0.4);
+    const dx=hx+h.w/2-dw/2;
+    fillR(dx,gy-dh,dw,dh,h.door);
+    cx.strokeStyle='rgba(0,0,0,0.3)';cx.lineWidth=1;cx.strokeRect(dx,gy-dh,dw,dh);
+    fillR(dx+dw-5,gy-dh/2,3,3,'#FFD700'); // 손잡이
+    // 마당 (정원 있는 집)
+    if(h.hasGarden){
+      fillR(hx-8,gy-4,h.w+16,4,'#6A9848'); // 잔디
+      // 화분들
+      [[hx+4,gy-10],[hx+h.w-12,gy-10]].forEach(([fx,fy])=>{
+        fillR(fx,fy,8,6,'#C07030');
+        cx.fillStyle='#3A8828';cx.beginPath();cx.arc(fx+4,fy-4,6,0,Math.PI*2);cx.fill();
+      });
+    }
+  });
+
+  // 지면 — 콘크리트 도로
+  cx.beginPath();cx.moveTo(0,H);
+  for(let x=0;x<=W;x+=4)cx.lineTo(x,getGroundY(x+cam));
+  cx.lineTo(W,H);cx.closePath();
+  // 콘크리트 그라데이션
+  const road=cx.createLinearGradient(0,FL-20,0,H);
+  road.addColorStop(0,'#B0AEAD');road.addColorStop(0.1,'#9A9998');road.addColorStop(1,'#707070');
+  cx.fillStyle=road;cx.fill();
+
+  // 도로 균열/줄 (콘크리트 느낌)
+  cx.strokeStyle='rgba(80,80,80,0.25)';cx.lineWidth=1;
+  for(let gx=0;gx<WORLD;gx+=80){
+    const sx=gx-cam;if(sx<-10||sx>W+10)continue;
+    const gy=getGroundY(gx);
+    cx.beginPath();cx.moveTo(sx,gy);cx.lineTo(sx+2,gy+18);cx.stroke();
+  }
+  // 도로 중앙선 (점선)
+  cx.strokeStyle='rgba(255,220,0,0.35)';cx.lineWidth=2;cx.setLineDash([18,14]);
+  cx.beginPath();cx.moveTo(0,getGroundY(cam)+16);
+  for(let x=0;x<=W;x+=8)cx.lineTo(x,getGroundY(x+cam)+16);
+  cx.stroke();cx.setLineDash([]);
+
+  // 지면 윤곽선
+  cx.strokeStyle='#888880';cx.lineWidth=2;
+  cx.beginPath();cx.moveTo(0,getGroundY(cam));
+  for(let x=0;x<=W;x+=4)cx.lineTo(x,getGroundY(x+cam));
+  cx.stroke();
+
+  // 갈매기
+  seagulls.forEach(s=>{
+    cx.strokeStyle='rgba(255,255,255,0.82)';cx.lineWidth=1.5;
+    cx.beginPath();
+    cx.moveTo(s.x-5,s.y+Math.sin(s.wingAngle)*3);
+    cx.quadraticCurveTo(s.x,s.y-3,s.x+5,s.y+Math.sin(-s.wingAngle)*3);
+    cx.stroke();
+  });
+}
+
+function drawRocks(){
+  rocks.forEach(r=>{
+    if(r.used)return;
+    const sx=r.x-cam-4;if(sx<-40||sx>W+40)return;
+    spr(ROCK_SPR,sx-4,getGroundY(r.x)-24);
+  });
+}
+
+function drawCrabObstacles(){
+  crabObstacles.forEach(cr=>{
+    if(cr.used)return;
+    const sx=cr.x-cam;if(sx<-40||sx>W+40)return;
+    const gy=getGroundY(cr.x);
+    // 꽃게 몸체 (간단한 픽셀)
+    const bob=Math.sin(cr.phase)*3;
+    cx.font='26px serif';cx.textAlign='center';cx.fillText('🦀',sx+14,gy-4+bob);
+    // 무적 상태 아닌 경우 경고 표시
+    if(!hasInvincible){
+      cx.fillStyle='rgba(255,100,68,0.35)';
+      cx.beginPath();cx.ellipse(sx+14,gy-10,18,12,0,0,Math.PI*2);cx.fill();
+    }
+    // crabStun 중이면 스턴 바
+    if(crabStunTimer>0&&cr.used){
+      const barW=Math.round(36*(crabStunTimer/120));
+      fillR(PL.x-cam,PL.y-8,36,4,'rgba(0,0,0,.4)');
+      fillR(PL.x-cam,PL.y-8,barW,4,'#FF6644');
+    }
+  });
+  // 스턴 표시 (플레이어 위)
+  if(crabStunTimer>0){
+    const barW=Math.round(36*(crabStunTimer/120));
+    fillR(PL.x-cam,PL.y-10,36,5,'rgba(0,0,0,.5)');
+    fillR(PL.x-cam,PL.y-10,barW,5,'#FF6644');
+    cx.fillStyle='#FF6644';cx.font='bold 9px Courier New';cx.textAlign='center';
+    cx.fillText('🦀 점프불가',PL.x-cam+18,PL.y-14);
+  }
+}
+
+function drawBubble(x,y,w,txt){
+  cx.fillStyle='rgba(255,255,220,.95)';cx.fillRect(x,y,w,16);
+  cx.strokeStyle='#aaa';cx.lineWidth=1;cx.strokeRect(x,y,w,16);
+  cx.fillStyle='#333';cx.font='9px Courier New';cx.textAlign='left';cx.fillText(txt,x+4,y+12);
+}
+
+// 할머니 픽셀 아트 (게 잡는 할머니)
+function drawCrabHalmeoni(sx,gy){
+  // 머리
+  fillR(sx+5,gy-38,16,12,'#F0C09A');
+  fillR(sx+6,gy-44,14,8,'#E8E8DC'); // 흰머리
+  fillR(sx+4,gy-46,18,6,'#D8D8CC');
+  // 눈/코
+  fillR(sx+8,gy-33,3,3,'#333');fillR(sx+15,gy-33,3,3,'#333');
+  fillR(sx+11,gy-28,4,2,'#C09070');
+  // 몸 (민소매 고무 장갑 느낌)
+  fillR(sx+3,gy-26,20,18,'#4A7A40'); // 초록 작업복
+  fillR(sx+1,gy-24,6,12,'#4A7A40');fillR(sx+19,gy-24,6,12,'#4A7A40');
+  // 고무장갑
+  fillR(sx-1,gy-14,8,8,'#FF6644');fillR(sx+19,gy-14,8,8,'#FF6644');
+  // 앞치마
+  fillR(sx+5,gy-20,16,14,'#D4A040');
+  // 다리
+  fillR(sx+5,gy-8,8,10,'#4A3020');fillR(sx+13,gy-8,8,10,'#4A3020');
+  fillR(sx+3,gy+2,12,5,'#3A2010');fillR(sx+12,gy+2,12,5,'#3A2010');
+  // 양동이
+  fillR(sx+24,gy-12,14,14,'#CC4400');
+  fillR(sx+22,gy-14,18,3,'#BB3300');
+  cx.fillStyle='#FF9900';cx.font='10px serif';cx.textAlign='center';cx.fillText('🦀',sx+31,gy-4);
+}
+
+// 할아버지 (그물 꿰매기)
+function drawNetHarabeoji(sx,gy){
+  fillR(sx+4,gy-40,18,14,'#F2C06A');
+  fillR(sx+2,gy-46,22,8,'#3A2A18'); // 선원 모자
+  fillR(sx+0,gy-40,4,4,'#3A2A18');fillR(sx+22,gy-40,4,4,'#3A2A18');
+  fillR(sx+7,gy-34,4,4,'#333');fillR(sx+14,gy-34,4,4,'#333');
+  fillR(sx+9,gy-28,6,2,'#C09060');
+  fillR(sx+5,gy-22,16,2,'#8B4513'); // 수염
+  fillR(sx+2,gy-24,22,18,'#1A4A8A'); // 남색 작업복
+  fillR(sx+0,gy-22,6,14,'#1A4A8A');fillR(sx+20,gy-22,6,14,'#1A4A8A');
+  fillR(sx+0,gy-10,6,8,'#F2C06A');fillR(sx+20,gy-10,6,8,'#F2C06A');
+  fillR(sx+4,gy-6,10,8,'#0A2A6A');fillR(sx+12,gy-6,10,8,'#0A2A6A');
+  fillR(sx+2,gy+2,14,5,'#3A2818');fillR(sx+12,gy+2,14,5,'#3A2818');
+}
+
+// 항해사 할아버지
+function drawSailorGrandpa(sx,gy){
+  fillR(sx+4,gy-42,18,14,'#F2C06A');
+  fillR(sx+2,gy-50,22,10,'#1A3A6A');
+  fillR(sx+0,gy-42,5,5,'#1A3A6A');fillR(sx+21,gy-42,5,5,'#1A3A6A');
+  fillR(sx+6,gy-36,4,4,'#222');fillR(sx+14,gy-36,4,4,'#222');
+  fillR(sx+4,gy-30,18,6,'#F8F8F0');
+  fillR(sx+2,gy-26,22,20,'#2A4A8A');
+  fillR(sx+12,gy-24,4,4,'#FFD700');fillR(sx+12,gy-18,4,4,'#FFD700');
+  fillR(sx+0,gy-24,6,16,'#2A4A8A');fillR(sx+20,gy-24,6,16,'#2A4A8A');
+  fillR(sx+0,gy-10,6,7,'#F2C06A');fillR(sx+20,gy-10,6,7,'#F2C06A');
+  fillR(sx+4,gy-6,10,8,'#1A2A5A');fillR(sx+12,gy-6,10,8,'#1A2A5A');
+  fillR(sx+2,gy+2,14,5,'#4A3018');fillR(sx+12,gy+2,14,5,'#4A3018');
+}
+
+// 동네 아저씨 (스도쿠)
+function drawSudokuAjeossi(sx,gy){
+  fillR(sx+4,gy-40,18,14,'#E8B880');
+  fillR(sx+4,gy-46,18,8,'#2A2A2A'); // 검은 머리
+  fillR(sx+6,gy-34,4,4,'#222');fillR(sx+13,gy-34,4,4,'#222');
+  // 안경
+  cx.strokeStyle='#888';cx.lineWidth=1.5;
+  cx.strokeRect(sx+5,gy-35,6,5);cx.strokeRect(sx+13,gy-35,6,5);
+  cx.beginPath();cx.moveTo(sx+11,gy-32);cx.lineTo(sx+13,gy-32);cx.stroke();
+  fillR(sx+9,gy-28,6,2,'#C09060');
+  fillR(sx+2,gy-24,22,20,'#A04020'); // 빨간 체크 남방
+  fillR(sx+0,gy-22,6,14,'#A04020');fillR(sx+20,gy-22,6,14,'#A04020');
+  fillR(sx+0,gy-10,6,7,'#E8B880');fillR(sx+20,gy-10,6,7,'#E8B880');
+  // 신문/종이 들고 있음
+  fillR(sx+20,gy-18,16,12,'#F8F0E0');
+  cx.fillStyle='#888';cx.font='6px sans-serif';cx.textAlign='left';cx.fillText('数',sx+22,gy-10);
+  fillR(sx+4,gy-6,10,8,'#3A2010');fillR(sx+12,gy-6,10,8,'#3A2010');
+  fillR(sx+2,gy+2,14,5,'#2A1808');fillR(sx+12,gy+2,14,5,'#2A1808');
+}
+
+function drawNPCs(){
+  // 첫 번째 집 이벤트 (들개 입양)
+  if(firstHouseNPC&&!firstHouseNPC.met){
+    const sx=firstHouseNPC.x-cam;if(sx>-80&&sx<W+80){
+      const gy=getGroundY(firstHouseNPC.x);
+      if(Math.abs(PL.x-firstHouseNPC.x)<220)drawBubble(sx-15,gy-62,120,'집에 들어가볼까?');
+    }
+  }
+
+  // 게잡이 할머니
+  if(crabHalmeoniNPC&&!crabHalmeoniNPC.met){
+    const sx=crabHalmeoniNPC.x-cam;if(sx>-80&&sx<W+80){
+      const gy=getGroundY(crabHalmeoniNPC.x);
+      drawCrabHalmeoni(sx,gy);
+      if(Math.abs(PL.x-crabHalmeoniNPC.x)<220)drawBubble(sx-20,gy-64,110,'게를 잡아다오!');
+    }
+  }
+
+  // 스도쿠 아저씨
+  if(sudokuNPC&&!sudokuNPC.met){
+    const sx=sudokuNPC.x-cam;if(sx>-80&&sx<W+80){
+      const gy=getGroundY(sudokuNPC.x);
+      drawSudokuAjeossi(sx,gy);
+      if(Math.abs(PL.x-sudokuNPC.x)<220)drawBubble(sx-20,gy-62,110,'스도쿠 도와줘!');
+    }
+  }
+
+  // 그물 꿰매기 할아버지
+  if(netNPC&&!netNPC.met){
+    const sx=netNPC.x-cam;if(sx>-80&&sx<W+80){
+      const gy=getGroundY(netNPC.x);
+      drawNetHarabeoji(sx,gy);
+      if(Math.abs(PL.x-netNPC.x)<220)drawBubble(sx-20,gy-62,110,'그물 좀 꿰매줘!');
+    }
+  }
+
+  // 항구 항해사
+  if(harborNPC&&!harborNPC.met){
+    const sx=harborNPC.x-cam;if(sx>-200&&sx<W+200){
+      const gy=getGroundY(harborNPC.x);
+      // 항구 구조물
+      fillR(sx-60,gy-20,160,20,'#8B6020'); // 부두
+      fillR(sx-58,gy-38,10,20,'#7A5010');fillR(sx+88,gy-38,10,20,'#7A5010'); // 말뚝
+      // 배
+      fillR(sx+20,gy-34,80,24,'#C88020');
+      fillR(sx+18,gy-38,84,6,'#B87010');
+      cx.fillStyle='#8B5A10';cx.beginPath();cx.moveTo(sx+18,gy-34);cx.lineTo(sx+10,gy-20);cx.lineTo(sx+102,gy-20);cx.lineTo(sx+102,gy-34);cx.closePath();cx.fill();
+      // 돛대
+      fillR(sx+56,gy-80,4,48,'#6A4010');
+      fillR(sx+44,gy-74,32,2,'#5A3008');
+      cx.fillStyle='rgba(240,240,200,0.85)';cx.beginPath();cx.moveTo(sx+58,gy-78);cx.lineTo(sx+58,gy-48);cx.lineTo(sx+84,gy-64);cx.closePath();cx.fill();
+      drawSailorGrandpa(sx-20,gy);
+      if(Math.abs(PL.x-harborNPC.x)<300)drawBubble(sx-50,gy-78,140,'항구에 어서 와! ⚓');
+    }
+  }
+
+  // 들개 동행
+  if(strayDogCompanion.active&&!dogAdopted){
+    const dx=strayDogCompanion.x-cam;if(dx>-40&&dx<W+40){
+      const dgy=getGroundY(strayDogCompanion.x);
+      const sp=strayDogCompanion.wf<2?JINDO_RUN1:JINDO_RUN2;
+      sprJindo(sp,dx,dgy-42,false);
+    }
+  }
+}
+
+function drawPlayer(){
+  const ppx=PL.x-cam,ppy=PL.y;
+  const blink=PL.inv>0&&Math.floor(PL.inv/7)%2===1;
+  if(blink)cx.globalAlpha=0.35;
+  cx.globalAlpha*=0.28;cx.fillStyle='#000';const shadowGY=getGroundY(PL.x+18);cx.beginPath();cx.ellipse(ppx+18,shadowGY+4,16,5,0,0,Math.PI*2);cx.fill();
+  cx.globalAlpha=blink?0.35:1;
+  spr(PL.ground&&Math.abs(PL.vx)>.5?(PL.wf<2?D_RUN1:D_RUN2):D_JMP,ppx,ppy);
+  cx.globalAlpha=1;
+}
+
+function drawHUD(){
+  const hbw=14+maxHearts*34+6;fillR(8,8,hbw,34,'rgba(0,0,0,.5)');
+  for(let i=0;i<maxHearts;i++){
+    const v=hearts-i,hx=14+i*34;
+    [[4,0,8,3],[2,3,12,3],[0,6,16,3],[0,9,16,3],[2,12,12,3],[4,15,8,3],[6,18,4,3]].forEach(([ox,oy,w2,h2])=>{
+      cx.fillStyle=v>=1?'#FF3850':'#333';cx.fillRect(hx+ox,14+oy,w2,h2);
+    });
+  }
+  fillR(W-218,8,110,34,'rgba(0,0,0,.5)');
+  cx.fillStyle='#FFD700';cx.font='bold 14px Courier New';cx.textAlign='right';cx.fillText(String(score).padStart(6,'0'),W-114,30);
+  // PAUSE 버튼
+  const pb=pauseBtnRect;fillR(pb.x,pb.y,pb.w,pb.h,'rgba(0,0,0,0.72)');
+  cx.strokeStyle='#FFD700';cx.lineWidth=2;cx.strokeRect(pb.x,pb.y,pb.w,pb.h);
+  cx.fillStyle='#FFD700';cx.font='bold 15px Courier New';cx.textAlign='center';cx.fillText('❚❚',pb.x+pb.w/2,pb.y+17);
+  cx.fillStyle='rgba(255,215,0,0.75)';cx.font='bold 9px Courier New';cx.fillText('PAUSE',pb.x+pb.w/2,pb.y+30);
+  // 음소거 버튼 (PAUSE 왼쪽)
+  const muted=ChoAudio.isMuted();
+  fillR(W-122,8,48,34,'rgba(0,0,0,0.72)');
+  cx.strokeStyle=muted?'#888':'#4AA8CC';cx.lineWidth=2;cx.strokeRect(W-122,8,48,34);
+  cx.font='16px serif';cx.textAlign='center';cx.fillText(muted?'🔇':'🔊',W-98,30);
+  if(rockSlowTimer>0){fillR(PL.x-cam,PL.y-8,Math.round(36*(rockSlowTimer/120)),4,'#8888ff');}
+  if(hasBag){fillR(W-218,46,80,22,'rgba(0,0,0,.5)');cx.font='12px serif';cx.textAlign='left';cx.fillText('🎒',W-216,63);cx.fillStyle='#aaa';cx.font='9px Courier New';cx.fillText('B키',W-198,63);}
+  if(hasInvincible){fillR(W/2-64,8,128,28,'rgba(0,0,0,.6)');cx.fillStyle='#ffd700';cx.font='bold 11px Courier New';cx.textAlign='center';cx.fillText('🛡 무적 '+Math.ceil(invincibleTimer/60)+'초',W/2,27);}
+  if(strayDogCompanion.active&&!dogAdopted){fillR(8,44,90,18,'rgba(0,0,0,.5)');cx.fillStyle='#C8A060';cx.font='bold 9px Courier New';cx.textAlign='left';cx.fillText('🐕 '+strayDogCompanion.name,14,57);}
+  const prog=Math.min(PL.x/WORLD,1);fillR(8,H-18,W-16,10,'rgba(0,0,0,.5)');fillR(8,H-18,(W-16)*prog,10,'#4AA8CC');
+  popups.forEach(p=>{cx.globalAlpha=Math.min(1,p.life/20);cx.fillStyle=p.c;cx.font='bold 12px Courier New';cx.textAlign='center';cx.fillText(p.t,p.x-cam+18,p.y-6);cx.globalAlpha=1;});
+  [[MB.left,'◀',mobileKeys.left,'#ffd700'],[MB.right,'▶',mobileKeys.right,'#ffd700'],[MB.jump,'▲',mobileKeys.jump,'#69f0ae']].forEach(([btn,label,active,col])=>{
+    cx.globalAlpha=active?0.75:0.40;fillR(btn.x,btn.y,btn.w,btn.h,'#000');cx.strokeStyle=col;cx.lineWidth=2;cx.strokeRect(btn.x,btn.y,btn.w,btn.h);
+    cx.fillStyle=col;cx.font='bold 24px sans-serif';cx.textAlign='center';cx.fillText(label,btn.x+btn.w/2,btn.y+btn.h/2+9);cx.globalAlpha=1;
+  });
+}
+
+function drawTitle(){
+  drawBG();fillR(0,0,W,H,'rgba(0,0,0,.48)');
+  fillR(W/2-220,76,440,268,'#0e0e1e');cx.strokeStyle='#4AA8CC';cx.lineWidth=3;cx.strokeRect(W/2-220,76,440,268);
+  cx.fillStyle='#FFD700';cx.font='bold 26px Courier New';cx.textAlign='center';cx.fillText('🐾 조백호의 여행',W/2,118);
+  cx.fillStyle='#4AA8CC';cx.font='16px Courier New';cx.fillText('5장: 바닷가 어촌마을',W/2,148);
+  cx.fillStyle='#aaa';cx.font='11px Courier New';
+  cx.fillText('🦀 게잡이 할머니   🧩 스도쿠 아저씨   🪝 그물 꿰매기',W/2,178);
+  cx.fillText('🐕 들개 입양   ⚓ 항구 항해사',W/2,198);
+  if(ch4Save.strayDogName){cx.fillStyle='#C8A060';cx.font='11px Courier New';cx.fillText('🐕 '+ch4Save.strayDogName+' 와 함께!',W/2,220);}
+  if(Math.floor(frame/22)%2===0){cx.fillStyle='#FFD700';cx.font='bold 12px Courier New';cx.fillText('[ SPACE / 클릭 ]',W/2,250);}
+  spr(D_RUN1,W/2-18,264);
+}
+
+// ── 튜토리얼 ────────────────────────────────────
+const TUT_PAGES=[
+  {title:'🌊 5장: 바닷가 어촌마을',content:`
+    <div class="tut-row"><span class="tut-icon">🏘️</span><span class="tut-text">드디어 바닷가 어촌마을 도착!<br>파란 지붕 흰 집들이 가득해!</span></div>
+    <div class="tut-row"><span class="tut-icon">🎮</span><span class="tut-text">이동: ← → / A,D &nbsp; 점프: ↑ / 스페이스</span></div>
+    <div class="tut-row"><span class="tut-icon">🎒</span><span class="tut-text">인벤토리: B 키</span></div>
+    <div class="tut-row"><span class="tut-icon">⏸</span><span class="tut-text">일시정지: P 키 또는 화면 우상단</span></div>
+  `},
+  {title:'🐾 마을 사람들',content:`
+    <div class="tut-row"><span class="tut-icon">🐕</span><span class="tut-text"><b style="color:#C8A060">첫 번째 집</b>: 들개를 이 집에 맡겨요!</span></div>
+    <div class="tut-row"><span class="tut-icon">🦀</span><span class="tut-text"><b style="color:#FF6644">게잡이 할머니</b>: 모래구멍에서 게 잡기 → +25점</span></div>
+    <div class="tut-row"><span class="tut-icon">🧩</span><span class="tut-text"><b style="color:#82b1ff">스도쿠 아저씨</b>: 4×4 스도쿠 풀기 → +25점</span></div>
+    <div class="tut-row"><span class="tut-icon">🪝</span><span class="tut-text"><b style="color:#69f0ae">그물 할아버지</b>: 패턴 꿰매기 → +25점</span></div>
+    <div class="tut-row"><span class="tut-icon">⚓</span><span class="tut-text"><b style="color:#4AA8CC">항구 항해사</b>: 이야기 나누기 → 클리어!</span></div>
+  `},
+];
+let tutPage=0;
+function showTutorial(){gs='howto';tutPage=0;OV.style.display='flex';renderTut();ChoAudio.getCtx();}
+function renderTut(){
+  const p=TUT_PAGES[tutPage],isLast=tutPage===TUT_PAGES.length-1;
+  PNL.innerHTML='<h2>'+p.title+'</h2><div style="margin:8px 0">'+p.content+'</div>'
+    +'<p style="font-size:clamp(14px,1.8vw,20px);color:#555;margin-top:6px">'+(tutPage+1)+'/'+TUT_PAGES.length+'</p>'
+    +(tutPage>0?'<button class="btn b" onclick="prevTut()">◀ 이전</button>':'')
+    +(isLast?'<button class="btn g" onclick="startGame()">출발! 🐾</button>':'<button class="btn g" onclick="nextTut()">다음 ▶</button>');
+}
+function nextTut(){if(tutPage<TUT_PAGES.length-1){tutPage++;renderTut();}}
+window.nextTut=nextTut;
+window.prevTut=()=>{if(tutPage>0){tutPage--;renderTut();}};
+
+function togglePause(){
+  if(gs==='playing'){gs='paused';OV.style.display='flex';showPausePanel();ChoBGM.pause();}
+  else if(gs==='paused'){gs='playing';OV.style.display='none';ChoBGM.resume();}
+}
+function toggleInv(){
+  if(!hasBag)return;
+  if(gs==='playing'){gs='inv';OV.style.display='flex';renderInvGrid5();}
+  else if(gs==='inv'){gs='playing';OV.style.display='none';}
+}
+window.resumePlay=()=>{OV.style.display='none';gs='playing';PL.inv=Math.max(PL.inv,180);ChoBGM.resume();};
+window.skipPuzzle=()=>{
+  if(window._puzzleCleanup){window._puzzleCleanup();window._puzzleCleanup=null;}
+  OV.style.display='none';gs='playing';ChoBGM.resume();
+};
+function showPausePanel(){
+  PNL.innerHTML='<h2>⏸ 일시정지</h2><p>점수: <b style="color:#ffd700">'+score+'</b></p>'
+    +'<div class="btn-row"><button class="btn g" onclick="resumePlay()">계속 ▶</button>'
+    +'<button class="btn r" onclick="initGame();startGame()">처음부터</button></div>';
+}
+function showPanel(t){
+  OV.style.display='flex';ChoBGM.stop();
+  if(t==='over')PNL.innerHTML='<h2>💔 게임 오버</h2><p>점수: <b style="color:#ffd700">'+score+'</b></p>'
+    +'<div class="btn-row"><button class="btn g" onclick="showLeaderboard()">점수 기록 🏆</button>'
+    +'<button class="btn" onclick="initGame();startGame()">다시 도전!</button></div>';
+}
+
+// ── 인벤토리 ─────────────────────────────────────
+const INV5D={'catAbility':{icon:'😸',name:'고양이 능력',desc:'이중 점프!',color:'#ff8a65'},'birdAbility':{icon:'🐦',name:'새 능력',desc:'날기!',color:'#42a5f5'},'lifePotion':{icon:'🧪',name:'생명수',desc:'하트 가득!',color:'#69f0ae'},'shield':{icon:'🛡️',name:'무적 방패',desc:'3초 무적!',color:'#ffd700'}};
+let _sk5='';
+function renderInvGrid5(sk){
+  sk=sk||_sk5;
+  const slots=[];
+  if(inventory.catAbility)slots.push({key:'catAbility',...INV5D.catAbility});
+  if(inventory.birdAbility)slots.push({key:'birdAbility',...INV5D.birdAbility});
+  for(let i=0;i<inventory.lifePotion;i++)slots.push({key:'lp'+i,...INV5D.lifePotion});
+  for(let i=0;i<inventory.shield;i++)slots.push({key:'sh'+i,...INV5D.shield});
+  inventory.items.forEach((it,i)=>slots.push({key:'item_'+i,icon:it.icon||'📦',name:it.name,desc:it.desc||'',color:'#aaa'}));
+  let cells='';
+  for(let i=0;i<24;i++){
+    const s=slots[i];const sel=s&&s.key===sk;
+    const bc=sel?'#ffd700':(s?'#555':'#222');
+    const oc=s?(' onclick="_sk5=\''+s.key+'\';renderInvGrid5(\''+s.key+'\')"'):'';
+    cells+='<div'+oc+' style="aspect-ratio:1;background:'+(s?'#1a1a40':'#0a0a18')+';border:2px solid '+bc+';border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:calc(min(7vw,32px));cursor:'+(s?'pointer':'default')+'">'+(s?s.icon:'')+'</div>';
+  }
+  const sel=sk?slots.find(s=>s&&s.key===sk):null;
+  let detail='<div style="color:#444;font-size:clamp(16px,2.2vw,24px);margin-top:20px;text-align:center">← 아이템 선택</div>';
+  if(sel){
+    const isStarMap=sel.name&&sel.name.includes('별자리 지도');
+    const isFood=sel.isFood;
+    const btnLabel=isStarMap?'지도 보기 🗺️':isFood?'먹기 ❤️+1':'사용하기';
+    detail='<div style="text-align:center;font-size:36px;margin-bottom:8px">'+sel.icon+'</div><b style="color:'+sel.color+';font-size:clamp(16px,2.2vw,24px);display:block;margin-bottom:6px">'+sel.name+'</b><p style="font-size:clamp(16px,2.2vw,24px);color:#bbb;margin-bottom:12px">'+sel.desc+'</p><button class="btn g" style="width:100%" onclick="useInv5(\''+sk+'\')">'+btnLabel+'</button>';
+  }
+  PNL.innerHTML='<div style="display:flex;gap:12px;align-items:flex-start"><div style="flex-shrink:0"><div style="font-size:clamp(14px,1.8vw,20px);color:#888;margin-bottom:6px;text-align:center">🎒 인벤토리</div><div style="display:grid;grid-template-columns:repeat(4,1fr);gap:5px;width:min(44vw,260px)">'+cells+'</div></div><div style="flex:1;min-width:0;padding-top:20px">'+detail+'</div></div><button class="btn" style="margin-top:10px;display:block;width:100%" onclick="toggleInv()">닫기 (B)</button>';
+}
+window.useInv5=function(key){
+  if(key==='catAbility'){inventory.catAbility=false;PL.catAb=true;popups.push({x:PL.x,y:PL.y,t:'😸 이중점프!',c:'#ff8a65',life:70});toggleInv();}
+  else if(key==='birdAbility'){inventory.birdAbility=false;PL.birdAb=true;PL.birdBoosts=4;popups.push({x:PL.x,y:PL.y,t:'🐦 날기!',c:'#42a5f5',life:70});toggleInv();}
+  else if(key.startsWith('lp')){inventory.lifePotion--;hearts=maxHearts;popups.push({x:PL.x,y:PL.y,t:'💚 하트 가득!',c:'#69f0ae',life:70});renderInvGrid5();}
+  else if(key.startsWith('sh')){inventory.shield--;hasInvincible=true;invincibleTimer=180;popups.push({x:PL.x,y:PL.y,t:'🛡️ 무적!',c:'#ffd700',life:70});renderInvGrid5();}
+  else if(key.startsWith('item_')){
+    const idx=parseInt(key.replace('item_',''));
+    const item=inventory.items[idx];if(!item)return;
+    // 별자리 지도 → 보기
+    if(item.name&&item.name.includes('별자리 지도')){
+      PNL.innerHTML='<h2 style="color:#ffd700">📜 별자리 지도</h2>'
+        +'<p class="mg-sub" style="margin-bottom:4px">산 정상에서 그린 별자리 지도... 알고보니 보물섬 항로 지도!</p>'
+        +MAP_SVG
+        +'<p class="mg-sub" style="margin-top:4px;color:#ffd700">항구 항해사 할아버지에게 보여주면 퀴즈를 풀 수 있어!</p>'
+        +'<button class="btn g" style="margin-top:8px" onclick="renderInvGrid5()">닫기</button>';
+      return;
+    }
+    // 음식 아이템 → fn으로 실행 (하트 +1)
+    if(item.isFood&&item.fn&&window[item.fn]){
+      window[item.fn]();return;
+    }
+    popups.push({x:PL.x,y:PL.y,t:'여기선 쓸 수 없어요',c:'#ff8a65',life:60});renderInvGrid5();
+  }
+  else{popups.push({x:PL.x,y:PL.y,t:'여기선 쓸 수 없어요',c:'#ff8a65',life:60});renderInvGrid5();}
+};
+
+// ══════════════════════════════════════════════════
+//  이벤트 0: 첫 번째 집 — 어부 아저씨 + 들개 입양 (무조건)
+// ══════════════════════════════════════════════════
+function showFirstHouseEvent(){
+  gs='puzzle';OV.style.display='flex';
+  if(!strayDogHas){
+    // 들개 없으면 어부 아저씨 혼자 집에 있음
+    PNL.innerHTML='<div style="font-size:36px;margin-bottom:4px">🏠</div><h2 style="color:#4AA8CC">어부 아저씨의 집</h2>'
+      +'<div style="background:#1a1a30;border:1px solid #4AA8CC;padding:12px;margin-bottom:10px;text-align:left;line-height:1.9;font-size:clamp(16px,2.2vw,24px)">'
+      +'<span style="color:#aaa;font-style:italic">(파란 지붕의 아담한 집. 텅 빈 마당에 오래된 개집이 보인다)</span><br>'
+      +'<span style="color:#eee">"어, 강아지가 왔네... 혼자구나."</span><br>'
+      +'<span style="color:#aaa">"나도 혼자인지 오래됐어. 개집은 있는데 개가 없지, 허허."</span></div>'
+      +'<button class="btn g" onclick="resumePlay()">계속! 🐾</button>';
+    firstHouseDone=true;return;
+  }
+  // 들개 있으면 — 1페이지: 사연
+  showFishermanPage1();
+}
+
+function showFishermanPage1(){
+  PNL.innerHTML='<div style="font-size:36px;margin-bottom:4px">🏠</div>'
+    +'<h2 style="color:#C8A060">어부 아저씨의 집</h2>'
+    +'<div style="background:#1a1a30;border:1px solid #C8A060;padding:12px;margin-bottom:10px;text-align:left;line-height:1.9;font-size:clamp(16px,2.2vw,24px)">'
+    +'<span style="color:#aaa;font-style:italic">(파란 지붕의 집 마당. 낡은 어망과 빈 개집이 보인다)</span><br>'
+    +'<span style="color:#eee">"어, 강아지가 왔구나...! 그 옆에 개도 같이 왔어?"</span><br>'
+    +'<span style="color:#aaa;font-style:italic">('+strayDogName+'이(가) 마당 냄새를 킁킁 맡으며 개집 앞에서 멈춘다)</span><br>'
+    +'<span style="color:#eee">"오호... 개집에 관심이 있나보네."</span></div>'
+    +'<button class="btn g" onclick="showFishermanPage2()">다음 ▶</button>';
+}
+window.showFishermanPage2=()=>{
+  PNL.innerHTML='<div style="font-size:36px;margin-bottom:4px">🎣</div>'
+    +'<h2 style="color:#C8A060">외로운 어부 아저씨</h2>'
+    +'<div style="background:#1a1a30;border:1px solid #C8A060;padding:12px;margin-bottom:10px;text-align:left;line-height:1.9;font-size:clamp(16px,2.2vw,24px)">'
+    +'<span style="color:#aaa;font-style:italic">(아저씨가 낡은 개집을 쓸쓸히 바라보며 말한다)</span><br>'
+    +'<span style="color:#eee">"예전에 키우던 개가 있었는데... 많이 늙어서 작년에 떠났어."</span><br>'
+    +'<span style="color:#eee">"여기서 혼자 고기잡이 하다 보면 많이 외롭거든."</span><br>'
+    +'<span style="color:#aaa;font-style:italic">('+strayDogName+'이(가) 아저씨 발 앞에 앉아 올려다본다)</span></div>'
+    +'<button class="btn g" onclick="showFishermanPage3()">다음 ▶</button>';
+};
+window.showFishermanPage3=()=>{
+  PNL.innerHTML='<div style="font-size:36px;margin-bottom:4px">💛</div>'
+    +'<h2 style="color:#ffd700">같이 살래?</h2>'
+    +'<div style="background:#1a1a30;border:1px solid #ffd700;padding:12px;margin-bottom:10px;text-align:left;line-height:1.9;font-size:clamp(16px,2.2vw,24px)">'
+    +'<span style="color:#aaa;font-style:italic">(아저씨가 조심스럽게 '+strayDogName+'의 머리를 쓰다듬는다)</span><br>'
+    +'<span style="color:#eee">"얘도 혼자 떠돌던 녀석이라고? ..."</span><br>'
+    +'<span style="color:#ffd700">"'+strayDogName+'아, 나랑 같이 살래? 평생 잘 돌봐줄게."</span><br>'
+    +'<span style="color:#aaa;font-style:italic">('+strayDogName+'이(가) 꼬리를 힘차게 흔들며 아저씨 무릎에 앞발을 올린다)</span></div>'
+    +'<button class="btn g" onclick="confirmAdoption()">'+strayDogName+'의 앞날을 응원한다 🐾</button>';
+};
+window.confirmAdoption=()=>{
+  dogAdopted=true;
+  strayDogCompanion.active=false;
+  firstHouseDone=true;
+  inventory.items.push({name:'종이 돛단배',icon:'⛵',desc:'어부 아저씨가 고마워서 직접 접어준 종이 돛단배. 뭔가 특별한 느낌이 든다...',fn:'',consumable:false,special:true,isPaperBoat:true});
+  PNL.innerHTML='<h2 style="color:#C8A060">🏠 입양 완료!</h2>'
+    +'<div style="background:#1a1a30;border:1px solid #C8A060;padding:12px;margin-bottom:10px;text-align:left;line-height:1.9;font-size:clamp(16px,2.2vw,24px)">'
+    +'<span style="color:#aaa;font-style:italic">('+strayDogName+'이(가) 마당을 신나게 뛰어다니며 짖는다)</span><br>'
+    +'<span style="color:#eee">"컹컹! 컹컹!!"</span><br>'
+    +'<span style="color:#C8A060">"고마워요, 강아지야. 잘 있어, '+strayDogName+'아! 🐾"</span><br>'
+    +'<span style="color:#aaa;font-style:italic">(아저씨가 가방에서 종이를 꺼내 빠르게 접어 건네준다)</span><br>'
+    +'<span style="color:#eee">"이거... 내가 젊을 때 만든 거야. 언젠가 쓸모가 있을 거야."</span></div>'
+    +'<div class="mg-hi">⛵ [종이 돛단배] 획득!</div>'
+    +'<button class="btn g" style="margin-top:8px" onclick="resumePlay()">계속! 🐾</button>';
+};
+
+// ══════════════════════════════════════════════════
+//  미니게임 1: 게 잡기 — 모래 구멍 클릭
+// ══════════════════════════════════════════════════
+function showCrabIntro(){
+  gs='puzzle';OV.style.display='flex';
+  PNL.innerHTML='<div style="font-size:36px;margin-bottom:4px">🦀</div><h2 style="color:#FF6644">게잡이 할머니!</h2>'
+    +'<div style="background:#1a1a30;border:1px solid #FF6644;padding:12px;margin-bottom:10px;text-align:left;line-height:1.9;font-size:clamp(16px,2.2vw,24px)">'
+    +'<span style="color:#aaa;font-style:italic">(갯바위 앞에서 양동이를 든 할머니가 손짓한다)</span><br>'
+    +'<span style="color:#eee">"아이고, 마침 잘 왔네! 게들이 구멍에 숨어버렸어!"</span><br>'
+    +'<span style="color:#ffd700">"구멍에서 나오는 게를 잡아줘! ⏱️ 20초! 잘못 클릭하면 -1! 🦀"</span></div>'
+    +'<button class="btn g" onclick="startCrabGame()">게 잡기! 🦀</button>'
+    +'<button class="btn b" style="margin-left:8px" onclick="skipPuzzle()">그냥 가기</button>';
+}
+window.startCrabGame=()=>{
+  const COLS=4,ROWS=3,HOLES=COLS*ROWS;
+  const CW=500,CH=300;
+  const DUR_MIN=240,DUR_MAX=360;
+  const GAME_TIME=20;
+  crabCaught=0;crabMissed=0;
+  let timeLeft=GAME_TIME,running=true,crabLoop=null,timerLoop=null;
+  let curRow=0,curCol=0;
+  const hammerSVG=`<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><rect x="14" y="16" width="5" height="14" rx="1.5" fill="#8B5A2B"/><rect x="6" y="6" width="20" height="12" rx="3" fill="#888"/><rect x="7" y="7" width="8" height="10" rx="2" fill="#aaa"/><rect x="6" y="8" width="5" height="4" rx="1" fill="#C8C8C8"/></svg>`;
+  const hammerURL='data:image/svg+xml;base64,'+btoa(hammerSVG);
+  const PAD_X=50,PAD_Y=55,GAP_X=(CW-PAD_X*2)/(COLS-1),GAP_Y=(CH-PAD_Y*2)/(ROWS-1);
+  const holes=Array.from({length:HOLES},(_,i)=>({
+    x:PAD_X+Math.floor(i%COLS)*GAP_X,
+    y:PAD_Y+Math.floor(i/COLS)*GAP_Y,
+    col:i%COLS,row:Math.floor(i/COLS),
+  }));
+  const holeStates=Array.from({length:HOLES},()=>({active:false,timer:0,duration:0,isMad:false}));
+  PNL.innerHTML='<h2 class="mg-title">🦀 게 잡기!</h2>'
+    +'<p class="mg-desc">잡은 게: <b id="cc">0</b>마리 &nbsp;|&nbsp; 실수: <b id="cmiss" style="color:#ff5252">0</b> &nbsp;|&nbsp; 남은 시간: <b id="ctimer" style="color:#ffd700">'+GAME_TIME+'</b>초</p>'
+    +'<p class="mg-sub" style="margin-bottom:2px">🖱️ 클릭 / 터치 &nbsp;|&nbsp; ⌨️ 방향키+스페이스 &nbsp;|&nbsp; 잘못 클릭 -1마리!</p>'
+    +'<canvas id="crabc" width="'+CW+'" height="'+CH+'" style="display:block;margin:4px auto;border:2px solid #FF6644;cursor:url(\''+hammerURL+'\'\\) 8 0,crosshair;width:min(500px,92vw);height:auto;touch-action:none"></canvas>'
+    +'<div id="crabmsg" class="mg-sub" style="min-height:1.4em;margin-top:2px">&nbsp;</div>'
+    +'<button class="btn b" style="font-size:clamp(14px,1.8vw,20px);padding:4px 10px;margin-top:4px" onclick="skipPuzzle()">그냥 가기</button>';
+  setTimeout(()=>{
+    const cc=document.getElementById('crabc');if(!cc)return;
+    const cctx=cc.getContext('2d');
+    function drawBeach(){
+      cctx.fillStyle='#C8A860';cctx.fillRect(0,0,CW,CH);
+      for(let i=0;i<50;i++){cctx.fillStyle='rgba(160,130,60,0.25)';cctx.fillRect(Math.sin(i*13.7)*CW/2+CW/2,Math.cos(i*7.3)*CH/2+CH/2,3,1);}
+      [[80,CH-60,42,10],[280,CH-50,34,8],[430,CH-65,26,7]].forEach(([px,py,rx,ry])=>{cctx.fillStyle='rgba(80,160,200,0.3)';cctx.beginPath();cctx.ellipse(px,py,rx,ry,0,0,Math.PI*2);cctx.fill();});
+      const curIdx=curRow*COLS+curCol;const ch2=holes[curIdx];
+      cctx.fillStyle='rgba(255,200,100,0.28)';cctx.beginPath();cctx.ellipse(ch2.x,ch2.y,34,20,0,0,Math.PI*2);cctx.fill();
+      cctx.strokeStyle='rgba(255,200,50,0.7)';cctx.lineWidth=2;cctx.beginPath();cctx.ellipse(ch2.x,ch2.y,34,20,0,0,Math.PI*2);cctx.stroke();
+      holes.forEach((h,i)=>{
+        const st=holeStates[i];
+        cctx.fillStyle='rgba(70,50,15,0.85)';cctx.beginPath();cctx.ellipse(h.x,h.y,18,10,0,0,Math.PI*2);cctx.fill();
+        cctx.strokeStyle='rgba(90,70,20,0.5)';cctx.lineWidth=1.5;cctx.beginPath();cctx.ellipse(h.x,h.y,18,10,0,0,Math.PI*2);cctx.stroke();
+        if(st.active){
+          const prog=st.timer/st.duration;
+          const bobY=h.y-14-Math.sin(prog*Math.PI)*10;
+          const scale=Math.min(1,prog*3);
+          cctx.save();cctx.translate(h.x,bobY);cctx.scale(scale,scale);
+          cctx.font='48px serif';cctx.textAlign='center';cctx.textBaseline='middle';
+          cctx.fillText(st.isMad?'🦞':'🦀',0,0);
+          if(prog>0.15){const bw=34,bh=5;cctx.fillStyle='rgba(0,0,0,0.45)';cctx.fillRect(-bw/2,20,bw,bh);cctx.fillStyle=prog>0.7?'#ff3333':'#33dd33';cctx.fillRect(-bw/2,20,bw*(1-prog),bh);}
+          cctx.restore();
+        }
+      });
+      cctx.font='22px serif';cctx.textAlign='center';cctx.fillText('🔨',ch2.x,ch2.y-32);
+    }
+    function spawnCrab(){
+      const avail=holeStates.map((s,i)=>s.active?-1:i).filter(i=>i>=0);
+      if(!avail.length)return;
+      const idx=avail[Math.floor(Math.random()*avail.length)];
+      holeStates[idx]={active:true,timer:0,duration:DUR_MIN+Math.floor(Math.random()*(DUR_MAX-DUR_MIN)),isMad:Math.random()<0.08};
+    }
+    let spawnTimer=0;
+    crabLoop=setInterval(()=>{
+      if(!running){clearInterval(crabLoop);return;}
+      spawnTimer++;if(spawnTimer%30===0)spawnCrab();
+      holeStates.forEach(st=>{if(!st.active)return;st.timer++;if(st.timer>=st.duration)st.active=false;});
+      drawBeach();
+    },16);
+    timerLoop=setInterval(()=>{
+      if(!running){clearInterval(timerLoop);return;}
+      timeLeft--;const tel=document.getElementById('ctimer');if(tel)tel.textContent=timeLeft;
+      if(timeLeft<=0){running=false;clearInterval(crabLoop);clearInterval(timerLoop);window._puzzleCleanup=null;setTimeout(crabTimeUp,300);}
+    },1000);
+    window._puzzleCleanup=()=>{clearInterval(crabLoop);clearInterval(timerLoop);document.removeEventListener('keydown',onCrabKey);};
+    function hitHole(idx){
+      if(idx<0||!running)return;
+      if(!holeStates[idx]||!holeStates[idx].active){
+        // 잘못 클릭: 게 없는 곳 → -1
+        crabCaught=Math.max(0,crabCaught-1);
+        crabMissed++;
+        const ccEl=document.getElementById('cc');if(ccEl)ccEl.textContent=crabCaught;
+        const cmEl=document.getElementById('cmiss');if(cmEl)cmEl.textContent=crabMissed;
+        const msg=document.getElementById('crabmsg');
+        if(msg){msg.style.color='#ff5252';msg.textContent='❌ 빗나감! -1';setTimeout(()=>{if(msg)msg.textContent='';},350);}
+        ChoSFX.fail();
+        return;
+      }
+      holeStates[idx].active=false;crabCaught++;
+      const ccEl=document.getElementById('cc');if(ccEl)ccEl.textContent=crabCaught;
+      const msg=document.getElementById('crabmsg');
+      if(msg){msg.style.color='#FF6644';msg.textContent='🦀 잡았다!';setTimeout(()=>{if(msg)msg.textContent='';},350);}
+      ChoSFX.item();
+    }
+    function onCrabPointer(mx,my){
+      if(!running)return;
+      let best=-1,bestD=40;
+      holeStates.forEach((st,i)=>{if(!st.active)return;const h=holes[i];const bobY=h.y-14-Math.sin((st.timer/st.duration)*Math.PI)*10;const d=Math.sqrt((mx-h.x)**2+(my-bobY)**2);if(d<bestD){bestD=d;best=i;}});
+      hitHole(best); // 맞으면 게 잡기, -1이면 빗나감
+    }
+    cc.addEventListener('click',e=>{const r=cc.getBoundingClientRect();onCrabPointer((e.clientX-r.left)*(CW/r.width),(e.clientY-r.top)*(CH/r.height));});
+    cc.addEventListener('touchstart',e=>{e.preventDefault();const r=cc.getBoundingClientRect();const t0=e.changedTouches[0];onCrabPointer((t0.clientX-r.left)*(CW/r.width),(t0.clientY-r.top)*(CH/r.height));},{passive:false});
+    function onCrabKey(e){
+      if(!running)return;
+      if(e.code==='ArrowLeft'){e.preventDefault();curCol=Math.max(0,curCol-1);}
+      else if(e.code==='ArrowRight'){e.preventDefault();curCol=Math.min(COLS-1,curCol+1);}
+      else if(e.code==='ArrowUp'){e.preventDefault();curRow=Math.max(0,curRow-1);}
+      else if(e.code==='ArrowDown'){e.preventDefault();curRow=Math.min(ROWS-1,curRow+1);}
+      else if(e.code==='Space'){e.preventDefault();hitHole(curRow*COLS+curCol);}
+    }
+    document.addEventListener('keydown',onCrabKey);
+  },50);
+};
+
+function crabTimeUp(){
+  crabDone=true;
+  gs='puzzle';OV.style.display='flex';
+  ChoSFX.win();
+  const pts=Math.min(crabCaught*2,40);
+  score+=pts;
+  // 꽃게 선물 (하트 +1 사용 가능)
+  inventory.items.push({name:'꽃게 선물',icon:'🦀',desc:'갯바위 할머니가 준 신선한 꽃게. 먹으면 기운이 난다!',fn:'useCrabGift',consumable:true,isFood:true,special:false});
+  window.useCrabGift=function(){
+    hearts=Math.min(maxHearts,hearts+1);
+    popups.push({x:PL.x,y:PL.y,t:'🦀 +1 ❤️',c:'#FF6644',life:70});
+    const mi=inventory.items.findIndex(it=>it.name==='꽃게 선물');if(mi>=0)inventory.items.splice(mi,1);
+    toggleInv();
+  };
+  const grade=crabCaught>=18?'🌟 완벽!':crabCaught>=12?'👍 잘했어!':crabCaught>=6?'😊 괜찮아!':'😅 아쉽다...';
+  PNL.innerHTML='<h2>⏱️ 시간 종료!</h2>'
+    +'<div style="background:#1a1a30;border:1px solid #FF6644;padding:10px;margin-bottom:10px;text-align:left;line-height:1.9;font-size:clamp(16px,2.2vw,24px)">'
+    +'<span style="color:#aaa;font-style:italic">(할머니가 양동이를 들여다본다)</span><br>'
+    +'<span style="color:#eee">"'+grade+' 총 '+crabCaught+'마리 잡았네!"</span></div>'
+    +'<div class="mg-hi">🦀 '+crabCaught+'마리 → +'+pts+'점!</div>'
+    +'<div class="mg-hi" style="margin-top:4px">🦀 [꽃게 선물] 획득! (언제든 ❤️+1)</div>'
+    +'<button class="btn g" style="margin-top:8px" onclick="resumePlay()">계속! 🐾</button>';
+}
+
+
+
+// ══════════════════════════════════════════════════
+//  미니게임 2: 4×4 스도쿠
+// ══════════════════════════════════════════════════
+function showSudokuIntro(){
+  gs='puzzle';OV.style.display='flex';
+  PNL.innerHTML='<div style="font-size:36px;margin-bottom:4px">🧩</div><h2 style="color:#82b1ff">스도쿠 아저씨!</h2>'
+    +'<div style="background:#1a1a30;border:1px solid #82b1ff;padding:12px;margin-bottom:10px;text-align:left;line-height:1.9;font-size:clamp(16px,2.2vw,24px)">'
+    +'<span style="color:#aaa;font-style:italic">(평상에 앉아 신문을 보던 아저씨가 반긴다)</span><br>'
+    +'<span style="color:#eee">"오, 개가 왔네! 나 스도쿠 한 칸 막혔는데..."</span><br>'
+    +'<span style="color:#ffd700">"4×4 스도쿠야! 1~4가 각 줄·칸·2×2박스에 하나씩! 🧩"</span></div>'
+    +'<button class="btn g" onclick="startSudoku()">풀어보기! 🧩</button>'
+    +'<button class="btn b" style="margin-left:8px" onclick="skipPuzzle()">그냥 가기</button>';
+}
+
+// 4×4 스도쿠 퍼즐 (완성된 판에서 일부 숨김)
+const SUDOKU_SOLUTIONS=[
+  [[1,2,3,4],[3,4,1,2],[2,1,4,3],[4,3,2,1]],
+  [[2,1,4,3],[4,3,2,1],[1,2,3,4],[3,4,1,2]],
+  [[3,4,1,2],[1,2,3,4],[4,3,2,1],[2,1,4,3]],
+  [[4,3,2,1],[2,1,4,3],[3,4,1,2],[1,2,3,4]],
+  [[1,3,2,4],[2,4,1,3],[3,1,4,2],[4,2,3,1]],
+  [[2,4,1,3],[1,3,2,4],[4,2,3,1],[3,1,4,2]],
+];
+let sdkBoard=[],sdkSolution=[],sdkFixed=[],sdkSelected=null,sdkErrors=0;
+const SDK_HIDE=7; // 숨길 칸 수
+
+window.startSudoku=()=>{
+  const sol=SUDOKU_SOLUTIONS[Math.floor(Math.random()*SUDOKU_SOLUTIONS.length)];
+  sdkSolution=sol.map(r=>[...r]);
+  sdkBoard=sol.map(r=>[...r]);
+  sdkFixed=Array.from({length:4},()=>Array(4).fill(false));
+  sdkErrors=0;sdkSelected=null;
+  // 랜덤으로 SDK_HIDE칸 숨기기
+  let hidden=0;
+  while(hidden<SDK_HIDE){
+    const r=Math.floor(Math.random()*4),c=Math.floor(Math.random()*4);
+    if(!sdkFixed[r][c]){sdkBoard[r][c]=0;sdkFixed[r][c]=false;hidden++;}
+  }
+  // 나머지는 고정
+  for(let r=0;r<4;r++)for(let c=0;c<4;c++){if(sdkBoard[r][c]!==0)sdkFixed[r][c]=true;}
+  renderSudoku();
+};
+
+function renderSudoku(){
+  const CS=Math.min(68,Math.floor(window.innerWidth*0.12));
+  let grid='';
+  for(let r=0;r<4;r++){
+    for(let c=0;c<4;c++){
+      const val=sdkBoard[r][c];
+      const fixed=sdkFixed[r][c];
+      const sel=sdkSelected&&sdkSelected[0]===r&&sdkSelected[1]===c;
+      const borderR=c===1?'border-right:3px solid #ffd700;':'';
+      const borderB=r===1?'border-bottom:3px solid #ffd700;':'';
+      const bg=sel?'#2a2060':fixed?'#1a1a30':'#0e0e24';
+      const col=fixed?'#ffd700':val?'#82b1ff':'#555';
+      grid+=`<div onclick="sdkClick(${r},${c})" style="width:${CS}px;height:${CS}px;background:${bg};border:1.5px solid #444;${borderR}${borderB}display:flex;align-items:center;justify-content:center;font-size:${CS*.45}px;font-weight:bold;color:${col};cursor:${fixed?'default':'pointer'};font-family:Courier New;user-select:none">${val||''}</div>`;
+    }
+  }
+  const numBtns=[1,2,3,4].map(n=>`<button onclick="sdkInput(${n})" class="btn b" style="font-size:clamp(20px,3vw,34px);padding:8px 18px;margin:3px">${n}</button>`).join('');
+  PNL.innerHTML='<h2 class="mg-title">🧩 4×4 스도쿠!</h2>'
+    +'<p class="mg-sub">각 행·열·2×2박스에 1~4 하나씩! &nbsp; 실수: <b id="sdkerr" style="color:#ff5252">'+sdkErrors+'</b></p>'
+    +'<div style="display:inline-grid;grid-template-columns:repeat(4,1fr);gap:0;border:2px solid #555;margin:8px auto">'+grid+'</div>'
+    +'<div style="margin:8px 0">'+numBtns
+    +'<button onclick="sdkInput(0)" class="btn r" style="font-size:clamp(18px,2.5vw,28px);padding:8px 14px;margin:3px">지우기</button></div>'
+    +'<button class="btn b" style="font-size:clamp(14px,1.8vw,20px);padding:4px 10px" onclick="skipPuzzle()">그냥 가기</button>';
+}
+window.sdkClick=function(r,c){
+  if(sdkFixed[r][c])return;
+  sdkSelected=[r,c];renderSudoku();
+};
+window.sdkInput=function(val){
+  if(!sdkSelected)return;
+  const [r,c]=sdkSelected;
+  if(sdkFixed[r][c])return;
+  if(val===0){sdkBoard[r][c]=0;renderSudoku();return;}
+  if(val!==sdkSolution[r][c]){
+    sdkErrors++;ChoSFX.miss();
+    const err=document.getElementById('sdkerr');if(err)err.textContent=sdkErrors;
+    // 빨간 깜빡임
+    sdkBoard[r][c]=val;renderSudoku();
+    setTimeout(()=>{if(sdkBoard[r]&&sdkBoard[r][c]===val){sdkBoard[r][c]=0;renderSudoku();}},600);
+    if(sdkErrors>=5){setTimeout(sudokuFail,700);}
+    return;
+  }
+  sdkBoard[r][c]=val;sdkSelected=null;
+  // 완성 체크
+  const done=sdkBoard.every((row,ri)=>row.every((v,ci)=>v===sdkSolution[ri][ci]));
+  if(done){setTimeout(sudokuSuccess,300);}
+  else renderSudoku();
+};
+function sudokuFail(){
+  ChoSFX.fail();
+  PNL.innerHTML='<h2>😅 실수가 너무 많아!</h2><p>5번 틀렸어...</p>'
+    +'<div class="btn-row"><button class="btn g" onclick="startSudoku()">다시!</button>'
+    +'<button class="btn b" onclick="skipPuzzle()">그냥 가기</button></div>';
+}
+function sudokuSuccess(){
+  sudokuDone=true;score+=25;ChoSFX.win();
+  inventory.items.push({name:'멸치 과자',icon:'🍘',desc:'아저씨가 고마워서 준 멸치 과자. 먹으면 기운이 솟아! ❤️+1',fn:'useMelchi',consumable:true,isFood:true,special:false});
+  window.useMelchi=function(){
+    hearts=Math.min(maxHearts,hearts+1);
+    popups.push({x:PL.x,y:PL.y,t:'🍘 +1 ❤️',c:'#82b1ff',life:70});
+    const mi=inventory.items.findIndex(it=>it.name==='멸치 과자');if(mi>=0)inventory.items.splice(mi,1);
+    toggleInv();
+  };
+  PNL.innerHTML='<h2>🎉 스도쿠 완성!</h2>'
+    +'<div style="background:#1a1a30;border:1px solid #82b1ff;padding:10px;margin-bottom:10px;text-align:left;line-height:1.9;font-size:clamp(16px,2.2vw,24px)">'
+    +'<span style="color:#aaa;font-style:italic">(아저씨가 무릎을 탁 치며 좋아한다)</span><br>'
+    +'<span style="color:#eee">"야, 개가 스도쿠를 풀어? 대단한 개네!"</span></div>'
+    +'<div class="mg-hi">🍘 [멸치 과자] 획득! (언제든 ❤️+1) &nbsp; +25점!</div>'
+    +'<button class="btn g" style="margin-top:8px" onclick="resumePlay()">계속! 🐾</button>';
+}
+
+// ══════════════════════════════════════════════════
+//  미니게임 3: 그물 꿰매기 — 패턴 완성
+// ══════════════════════════════════════════════════
+function showNetIntro(){
+  gs='puzzle';OV.style.display='flex';
+  PNL.innerHTML='<div style="font-size:36px;margin-bottom:4px">🪝</div><h2 style="color:#69f0ae">그물 꿰매기!</h2>'
+    +'<div style="background:#1a1a30;border:1px solid #69f0ae;padding:12px;margin-bottom:10px;text-align:left;line-height:1.9;font-size:clamp(16px,2.2vw,24px)">'
+    +'<span style="color:#aaa;font-style:italic">(창고 앞에서 할아버지가 찢어진 그물을 들고 있다)</span><br>'
+    +'<span style="color:#eee">"아이고, 어제 풍파에 그물이 찢어졌어!"</span><br>'
+    +'<span style="color:#ffd700">"빈 칸에 올바른 패턴을 이어서 그물을 꿰매줘! 🪝"</span></div>'
+    +'<button class="btn g" onclick="startNetGame()">꿰매기! 🪝</button>'
+    +'<button class="btn b" style="margin-left:8px" onclick="skipPuzzle()">그냥 가기</button>';
+}
+
+// 그물 패턴: 5×5 그리드에서 찢어진 부분(빈칸) 채우기
+// 규칙: 각 행·열에 ● ○ 패턴 (이진 스도쿠 느낌)
+const NET_SYMBOLS=['●','○'];
+let netBoard=[],netSolution=[],netFixed=[],netCurR=0,netCurC=0,netErrors=0;
+const NET_SIZE=5;
+
+window.startNetGame=()=>{
+  netErrors=0;netCurR=0;netCurC=0;
+  function makeNetSolution(){
+    const sol=[];
+    for(let r=0;r<NET_SIZE;r++){
+      let row,ok=false,tries=0;
+      while(!ok&&tries<100){
+        tries++;
+        row=Array.from({length:NET_SIZE},()=>Math.random()<0.5?0:1);
+        ok=true;
+        for(let c=0;c<NET_SIZE-2;c++){if(row[c]===row[c+1]&&row[c+1]===row[c+2]){ok=false;break;}}
+      }
+      sol.push(row);
+    }
+    for(let c=0;c<NET_SIZE;c++)for(let r=0;r<NET_SIZE-2;r++){
+      if(sol[r][c]===sol[r+1][c]&&sol[r+1][c]===sol[r+2][c])sol[r+1][c]=1-sol[r+1][c];
+    }
+    return sol;
+  }
+  netSolution=makeNetSolution();
+  netBoard=netSolution.map(r=>[...r]);
+  netFixed=Array.from({length:NET_SIZE},()=>Array(NET_SIZE).fill(true));
+  let hidden=0;
+  while(hidden<8){
+    const r=Math.floor(Math.random()*NET_SIZE),c=Math.floor(Math.random()*NET_SIZE);
+    if(netFixed[r][c]){netFixed[r][c]=false;netBoard[r][c]=-1;hidden++;}
+  }
+  // 커서를 첫 번째 빈 칸으로
+  outer:for(let r=0;r<NET_SIZE;r++)for(let c=0;c<NET_SIZE;c++){
+    if(!netFixed[r][c]){netCurR=r;netCurC=c;break outer;}
+  }
+
+  // 키보드 핸들러 등록
+  function onNetKey(e){
+    const active=['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','KeyZ','KeyX'].includes(e.code);
+    if(!active)return;
+    e.preventDefault();
+    if(e.code==='ArrowUp'){netCurR=Math.max(0,netCurR-1);}
+    else if(e.code==='ArrowDown'){netCurR=Math.min(NET_SIZE-1,netCurR+1);}
+    else if(e.code==='ArrowLeft'){netCurC=Math.max(0,netCurC-1);}
+    else if(e.code==='ArrowRight'){netCurC=Math.min(NET_SIZE-1,netCurC+1);}
+    else if(e.code==='KeyZ')netInputCell(netCurR,netCurC,0); // ● 채운 동그라미
+    else if(e.code==='KeyX')netInputCell(netCurR,netCurC,1); // ○ 빈 동그라미
+    renderNet();
+  }
+  document.addEventListener('keydown',onNetKey);
+  window._puzzleCleanup=()=>{document.removeEventListener('keydown',onNetKey);};
+  renderNet();
+};
+
+function netInputCell(r,c,val){
+  if(netFixed[r][c])return;
+  if(netBoard[r][c]===netSolution[r][c])return; // 이미 정답이면 무시
+  const prevVal=netBoard[r][c];
+  netBoard[r][c]=val;
+  if(val!==netSolution[r][c]){
+    if(prevVal===-1){
+      netErrors++;
+      const err=document.getElementById('neterr');if(err)err.textContent=netErrors;
+      if(netErrors>=6){setTimeout(netFail,400);}
+    }
+  }
+  // 완성 체크
+  const done=netBoard.every((row,ri)=>row.every((v,ci)=>netFixed[ri][ci]||v===netSolution[ri][ci]));
+  if(done){setTimeout(netSuccess,300);}
+}
+
+function renderNet(){
+  const CS=Math.min(58,Math.floor(window.innerWidth*0.09));
+  let grid='';
+  for(let r=0;r<NET_SIZE;r++){
+    for(let c=0;c<NET_SIZE;c++){
+      const val=netBoard[r][c];
+      const fixed=netFixed[r][c];
+      const isCursor=r===netCurR&&c===netCurC;
+      const bg=isCursor?'#2a4a2a':fixed?'#0a1a10':'#0a100a';
+      const border=isCursor?'3px solid #ffd700':fixed?'1.5px solid #2a3a2a':'1.5px solid #3a5a3a';
+      const sym=val===-1?'?':NET_SYMBOLS[val];
+      const col=fixed?(val===0?'#69f0ae':'#ffd700'):val===-1?'#444':'#82b1ff';
+      // 클릭: 빈칸이면 Z(●)=0, X(○)=1 사이 토글
+      const onclick=fixed?'':(`netCurR=${r};netCurC=${c};netInputCell(${r},${c},${val===-1?netSolution[r][c]:1-val});renderNet();`);
+      grid+=`<div onclick="${onclick}" style="width:${CS}px;height:${CS}px;background:${bg};border:${border};display:flex;align-items:center;justify-content:center;font-size:${CS*.48}px;color:${col};cursor:${fixed?'default':'pointer'};user-select:none">${sym}</div>`;
+    }
+  }
+  PNL.innerHTML='<h2 class="mg-title">🪝 그물 꿰매기!</h2>'
+    +'<p class="mg-sub">방향키 이동 | <b style="color:#69f0ae">Z=●(실)</b> <b style="color:#ffd700">X=○(구멍)</b> | 3연속 안 됨! &nbsp; 실수: <b id="neterr" style="color:#ff5252">'+netErrors+'</b></p>'
+    +'<div style="display:inline-grid;grid-template-columns:repeat('+NET_SIZE+',1fr);gap:2px;border:2px solid #3a6a3a;padding:4px;margin:6px auto;background:#1a2a1a">'+grid+'</div>'
+    +'<p class="mg-sub" style="margin-top:3px">● = 실 있음(Z) &nbsp; ○ = 구멍(X) &nbsp; 클릭도 가능!</p>'
+    +'<button class="btn b" style="font-size:clamp(14px,1.8vw,20px);padding:4px 10px;margin-top:4px" onclick="skipPuzzle()">그냥 가기</button>';
+}
+function netFail(){
+  ChoSFX.fail();
+  PNL.innerHTML='<h2>😅 그물이 더 찢어졌어!</h2><p>실수가 너무 많았어...</p>'
+    +'<div class="btn-row"><button class="btn g" onclick="startNetGame()">다시!</button>'
+    +'<button class="btn b" onclick="skipPuzzle()">그냥 가기</button></div>';
+}
+function netSuccess(){
+  netDone=true;score+=25;ChoSFX.win();
+  inventory.items.push({name:'말린 미역',icon:'🌿',desc:'할아버지가 고마워서 준 말린 미역. 먹으면 기운이 난다! ❤️+1',fn:'useMiyeok',consumable:true,isFood:true,special:false});
+  window.useMiyeok=function(){
+    hearts=Math.min(maxHearts,hearts+1);
+    popups.push({x:PL.x,y:PL.y,t:'🌿 +1 ❤️',c:'#69f0ae',life:70});
+    const mi=inventory.items.findIndex(it=>it.name==='말린 미역');if(mi>=0)inventory.items.splice(mi,1);
+    toggleInv();
+  };
+  PNL.innerHTML='<h2>🎉 그물 수리 완료!</h2>'
+    +'<div style="background:#1a1a30;border:1px solid #69f0ae;padding:10px;margin-bottom:10px;text-align:left;line-height:1.9;font-size:clamp(16px,2.2vw,24px)">'
+    +'<span style="color:#aaa;font-style:italic">(할아버지가 완성된 그물을 들고 활짝 웃는다)</span><br>'
+    +'<span style="color:#eee">"어이구 잘했어! 이제 고기 잡으러 나갈 수 있겠다!"</span></div>'
+    +'<div class="mg-hi">🌿 [말린 미역] 획득! (언제든 ❤️+1) &nbsp; +25점!</div>'
+    +'<button class="btn g" style="margin-top:8px" onclick="resumePlay()">계속! 🐾</button>';
+}
+
+// ══════════════════════════════════════════════════
+//  항구 — 별자리 지도(=보물섬 지도) 퀴즈 + 5장 클리어
+// ══════════════════════════════════════════════════
+function hasStarMap(){
+  return inventory.items.some(it=>it.name&&it.name.includes('별자리 지도'));
+}
+function hasPaperBoat(){
+  return inventory.items.some(it=>it.isPaperBoat);
+}
+
+// 지도 SVG (인라인, 패널 안에 표시)
+const MAP_SVG=`<svg width="100%" viewBox="0 0 340 260" xmlns="http://www.w3.org/2000/svg" style="display:block;margin:6px auto;border:2px solid #8B5020;border-radius:4px;max-width:min(680px,96vw)">
+<style>.tm{font-family:'Courier New',monospace;fill:#3A2010}.tlb{font-family:'Courier New',monospace;fill:#2A1008;font-weight:bold}</style>
+<rect width="340" height="260" fill="#F5E8C0"/>
+<ellipse cx="78" cy="45" rx="40" ry="24" fill="#C8A040" opacity="0.15"/>
+<ellipse cx="300" cy="220" rx="36" ry="26" fill="#B89030" opacity="0.13"/>
+<rect width="340" height="260" fill="#7BB8D4" opacity="0.28"/>
+<ellipse cx="168" cy="140" rx="84" ry="54" fill="#D4B87A"/>
+<ellipse cx="166" cy="138" rx="75" ry="47" fill="#8DB87A"/>
+<polygon points="120,108 132,88 144,108" fill="#8A7060"/>
+<polygon points="136,107 150,85 164,107" fill="#8A7060"/>
+<polygon points="152,108 166,87 180,108" fill="#8A7060"/>
+<ellipse cx="196" cy="148" rx="18" ry="13" fill="#4A8040"/>
+<ellipse cx="212" cy="145" rx="13" ry="10" fill="#4A8040"/>
+<ellipse cx="120" cy="158" rx="14" ry="10" fill="#4A8040"/>
+<ellipse cx="168" cy="140" rx="86" ry="55" fill="#D4B87A" opacity="0.35"/>
+<g transform="translate(82,137)"><ellipse cx="0" cy="0" rx="10" ry="8" fill="#E8E0C8" stroke="#8A6030" stroke-width="0.8"/>
+<ellipse cx="-3" cy="-1" rx="2.5" ry="3" fill="#3A2010"/><ellipse cx="3" cy="-1" rx="2.5" ry="3" fill="#3A2010"/>
+<rect x="-4" y="5" width="2.5" height="3" fill="#3A2010" rx="0.8"/><rect x="-1" y="5" width="2" height="3" fill="#3A2010" rx="0.8"/><rect x="2" y="5" width="2.5" height="3" fill="#3A2010" rx="0.8"/>
+<text x="0" y="20" class="tm" font-size="7.5" text-anchor="middle">해골 바위</text></g>
+<g transform="translate(148,178)"><line x1="0" y1="0" x2="-3" y2="-14" stroke="#6A4020" stroke-width="2"/>
+<ellipse cx="-3" cy="-14" rx="7" ry="4" fill="#4A8040" transform="rotate(-15,-3,-14)"/><ellipse cx="0" cy="-14" rx="7" ry="3.5" fill="#4A8040" transform="rotate(10,0,-14)"/></g>
+<g transform="translate(163,182)"><line x1="0" y1="0" x2="2" y2="-15" stroke="#6A4020" stroke-width="2"/>
+<ellipse cx="2" cy="-15" rx="7" ry="4" fill="#4A8040" transform="rotate(10,2,-15)"/></g>
+<g transform="translate(178,178)"><line x1="0" y1="0" x2="3" y2="-14" stroke="#6A4020" stroke-width="2"/>
+<ellipse cx="3" cy="-14" rx="7" ry="4" fill="#4A8040" transform="rotate(20,3,-14)"/></g>
+<text x="163" y="196" class="tm" font-size="8" text-anchor="middle">야자나무 세 그루</text>
+<ellipse cx="62" cy="80" rx="28" ry="18" fill="#D4B87A"/>
+<ellipse cx="60" cy="79" rx="23" ry="14" fill="#8DB87A"/>
+<text x="62" y="106" class="tm" font-size="8" text-anchor="middle">작은 섬</text>
+<ellipse cx="286" cy="192" rx="24" ry="15" fill="#D4B87A"/>
+<ellipse cx="284" cy="190" rx="20" ry="12" fill="#8DB87A"/>
+<text x="286" y="213" class="tm" font-size="8" text-anchor="middle">동쪽 섬</text>
+<g transform="translate(200,156)"><line x1="-9" y1="-9" x2="9" y2="9" stroke="#CC2010" stroke-width="2.8" stroke-linecap="round"/>
+<line x1="9" y1="-9" x2="-9" y2="9" stroke="#CC2010" stroke-width="2.8" stroke-linecap="round"/>
+<circle cx="0" cy="0" r="12" fill="none" stroke="#CC2010" stroke-width="1.2" stroke-dasharray="3,2"/></g>
+<text x="213" y="154" class="tm" font-size="8" text-anchor="start" fill="#CC2010" font-weight="bold">★보물</text>
+<g stroke="#C8901A" stroke-width="1.1" stroke-dasharray="3,2.5" fill="none">
+<line x1="98" y1="62" x2="124" y2="52"/><line x1="124" y1="52" x2="154" y2="46"/>
+<line x1="154" y1="46" x2="178" y2="58"/><line x1="178" y1="58" x2="196" y2="72"/>
+<line x1="196" y1="72" x2="196" y2="90"/><line x1="196" y1="90" x2="200" y2="156"/></g>
+<circle cx="98" cy="62" r="3.5" fill="#D4A020" stroke="#A07010" stroke-width="0.8"/>
+<circle cx="124" cy="52" r="3" fill="#D4A020" stroke="#A07010" stroke-width="0.8"/>
+<circle cx="154" cy="46" r="3.8" fill="#D4A020" stroke="#A07010" stroke-width="0.8"/>
+<circle cx="178" cy="58" r="3" fill="#D4A020" stroke="#A07010" stroke-width="0.8"/>
+<circle cx="196" cy="72" r="3.5" fill="#D4A020" stroke="#A07010" stroke-width="0.8"/>
+<circle cx="196" cy="90" r="3" fill="#D4A020" stroke="#A07010" stroke-width="0.8"/>
+<circle cx="200" cy="156" r="5.5" fill="#D4A020" stroke="#CC2010" stroke-width="1.5"/>
+<text x="92" y="56" class="tm" font-size="7" text-anchor="middle" fill="#8A6010">①</text>
+<text x="124" y="46" class="tm" font-size="7" text-anchor="middle" fill="#8A6010">②</text>
+<text x="154" y="40" class="tm" font-size="7" text-anchor="middle" fill="#8A6010">③</text>
+<text x="178" y="52" class="tm" font-size="7" text-anchor="middle" fill="#8A6010">④</text>
+<text x="206" y="66" class="tm" font-size="7" text-anchor="middle" fill="#8A6010">⑤</text>
+<text x="206" y="86" class="tm" font-size="7" text-anchor="middle" fill="#8A6010">⑥</text>
+<defs><marker id="arr" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M2 1L8 5L2 9" fill="none" stroke="#CC3020" stroke-width="1.5" stroke-linecap="round"/></marker></defs>
+<path d="M168 140 Q110 120 62 97" stroke="#CC3020" stroke-width="1.5" stroke-dasharray="6,4" fill="none" opacity="0.7" marker-end="url(#arr)"/>
+<text x="108" y="112" class="tm" font-size="7.5" fill="#CC3020" transform="rotate(-16,108,112)">항로</text><circle cx="0" cy="0" r="24" fill="#F0DCA0" stroke="#8B6020" stroke-width="1.2"/>
+<polygon points="0,-16 3,-5 0,-7 -3,-5" fill="#CC2010"/>
+<polygon points="0,16 3,5 0,7 -3,5" fill="#6A5030"/>
+<polygon points="-16,0 -5,3 -7,0 -5,-3" fill="#6A5030"/>
+<polygon points="16,0 5,3 7,0 5,-3" fill="#6A5030"/>
+<circle cx="0" cy="0" r="3.5" fill="#D4A020" stroke="#8B6020" stroke-width="0.8"/>
+<text x="0" y="-18" class="tlb" font-size="8" text-anchor="middle">N</text>
+<text x="0" y="27" class="tlb" font-size="8" text-anchor="middle">S</text>
+<text x="27" y="3" class="tlb" font-size="8" text-anchor="middle">E</text>
+<text x="-27" y="3" class="tlb" font-size="8" text-anchor="middle">W</text></g>
+<rect x="14" y="210" width="110" height="42" rx="3" fill="#F0DCA0" stroke="#8B6020" stroke-width="1.2"/>
+<text x="69" y="224" class="tlb" font-size="9" text-anchor="middle">범 례</text>
+<circle cx="22" cy="235" r="3" fill="#D4A020" stroke="#A07010" stroke-width="0.7"/>
+<text x="29" y="238" class="tm" font-size="8">별자리</text>
+<line x1="22" y1="247" x2="34" y2="247" stroke="#CC3020" stroke-width="1.5" stroke-dasharray="4,2"/>
+<text x="38" y="250" class="tm" font-size="8">항로</text>
+<rect x="170" y="18" width="142" height="20" rx="3" fill="#D4A040" stroke="#8B5020" stroke-width="1.2"/>
+<text x="241" y="32" class="tlb" font-size="10" text-anchor="middle">보물섬 항해 지도</text>
+<text x="326" y="254" class="tm" font-size="7" text-anchor="end" opacity="0.4">No.7 — 1743</text>
+</svg>`;
+
+// 지도 기반 퀴즈 (고정)
+const TREASURE_QUIZZES=[
+  {
+    q:'지도에서 별자리를 따라가면 마지막 ⑥번 별은 어디를 가리키나요?',
+    opts:['해골 바위 북쪽','야자나무 세 그루 남쪽','동쪽 섬 근처','숲 속 X 표시'],
+    ans:3,
+    hint:'별자리 선을 눈으로 따라가 봐! ⑥에서 수직으로 내려오면 X에 닿아.'
+  },
+  {
+    q:'지도의 "해골 바위"는 섬의 어느 쪽에 있나요?',
+    opts:['동쪽','북쪽','서쪽','남쪽'],
+    ans:2,
+    hint:'나침반과 해골 바위 위치를 비교해봐! 섬 왼쪽이 서쪽이야.'
+  },
+  {
+    q:'항로(점선)는 어디서 출발해서 어디로 향하나요?',
+    opts:['동쪽 섬 → 작은 섬','메인 섬 → 작은 섬','작은 섬 → 메인 섬','해골 바위 → 야자나무'],
+    ans:1,
+    hint:'화살표 방향을 따라가봐! 큰 섬에서 작은 섬 쪽으로 가는 길이야.'
+  },
+];
+let harborQuizScore=0;
+const harborQuizTotal=3;
+
+function showHarborEnd(){
+  gs='puzzle';OV.style.display='flex';ChoBGM.stop();
+  const hasMap=hasStarMap();
+  if(!hasMap){
+    localStorage.setItem('ch5_save',JSON.stringify({
+      score,dogType:ch4Save.dogType||'chiwa',strayDog:false,strayDogName:'',dogAdopted,
+      catAbility:inventory.catAbility,catEquipped:PL.catAb,
+      birdAbility:inventory.birdAbility,birdEquipped:PL.birdAb,
+      lifePotion:inventory.lifePotion,shield:inventory.shield,
+      maxHearts,hearts,items:inventory.items,crabDone,sudokuDone,netDone,
+      treasureQuizScore:0,canSail:false,hasStarMap:false,hasPaperBoat:false,
+    }));
+    score+=30;
+    PNL.innerHTML='<h2>⚓ 항구 도착!</h2>'
+      +'<div style="background:#1a1a30;border:1px solid #4AA8CC;padding:12px;margin-bottom:10px;text-align:left;line-height:1.9;font-size:clamp(16px,2.2vw,24px)">'
+      +'<span style="color:#aaa;font-style:italic">(오래된 배 앞에서 항해사 할아버지가 손을 흔든다)</span><br>'
+      +'<span style="color:#eee">"어, 잘 왔어! 근데... 별자리 지도가 없네?"</span><br>'
+      +'<span style="color:#aaa">"산에서 별자리 지도를 구해왔다면 보물섬으로 갈 수 있었는데!"</span></div>'
+      +'<p style="color:#ffd700">점수: <b>'+score+'</b></p>'
+      +'<div class="btn-row"><button class="btn g" onclick="showLeaderboard()">점수 기록 🏆</button>'
+      +'<button class="btn b" onclick="goToChapter6()">6장으로! →</button>'
+      +'<button class="btn" onclick="initGame();startGame()">처음부터</button></div>';
+    return;
+  }
+  harborQuizScore=0;
+  showHarborIntro();
+}
+
+function showHarborIntro(){
+  const mapItem=inventory.items.find(it=>it.name&&it.name.includes('별자리 지도'));
+  PNL.innerHTML='<h2 style="color:#4AA8CC">⚓ 항구 도착!</h2>'
+    +'<div style="font-size:28px;margin:4px 0">🗺️⚓🌊</div>'
+    +'<div style="background:#1a1a30;border:1px solid #4AA8CC;padding:12px;margin-bottom:8px;text-align:left;line-height:1.9;font-size:clamp(16px,2.2vw,24px)">'
+    +'<span style="color:#aaa;font-style:italic">(항해사 할아버지가 지도를 보더니 눈이 커진다)</span><br>'
+    +'<span style="color:#eee">"이건... 별자리 지도잖아?! 그런데 이 위의 선들이..."</span><br>'
+    +'<span style="color:#eee">"이건 별자리가 아니야! 보물섬까지 가는 항로야!!"</span><br>'
+    +'<span style="color:#ffd700">"지도를 보면서 내 질문에 대답해봐! 3문제! 🗺️"</span></div>'
+    +MAP_SVG
+    +'<button class="btn g" style="margin-top:6px" onclick="startHarborQuiz()">퀴즈 시작! 🗺️</button>';
+}
+window.startHarborQuiz=function(){showHarborQuizQ(0);};
+
+function showHarborQuizQ(idx){
+  if(idx>=harborQuizTotal){harborQuizEnd();return;}
+  const q=TREASURE_QUIZZES[idx];
+  const optBtns=q.opts.map((opt,i)=>`<button class="btn b" style="width:100%;margin:3px 0;text-align:left;font-size:clamp(15px,2vw,22px);padding:clamp(7px,1vw,12px) clamp(12px,1.8vw,20px)" onclick="answerHarbor(${i},${idx})">${['①','②','③','④'][i]} ${opt}</button>`).join('');
+  PNL.innerHTML='<h2 class="mg-title">🗺️ 퀴즈 (${n}/${t})!</h2>'.replace('${n}',idx+1).replace('${t}',harborQuizTotal)
+    +MAP_SVG
+    +'<div style="background:#1a1a2a;border:1px solid #ffd700;border-radius:6px;padding:10px;margin:6px 0;text-align:left">'
+    +'<div class="mg-sub" style="margin-bottom:4px">할아버지: "자, 지도를 잘 봐!"</div>'
+    +'<div class="mg-desc" style="line-height:1.6">'+q.q+'</div></div>'
+    +'<div style="max-width:420px;margin:0 auto">'+optBtns+'</div>';
+}
+
+window.answerHarbor=function(chosen,idx){
+  const q=TREASURE_QUIZZES[idx];
+  const correct=chosen===q.ans;
+  if(correct)harborQuizScore++;
+  const rc=correct?'#69f0ae':'#ff5252';
+  const rt=correct?'✅ 정답!':'❌ 아쉽지만 틀렸어!';
+  PNL.innerHTML='<h2 class="mg-title">🗺️ 퀴즈 (${n}/${t})!'.replace('${n}',idx+1).replace('${t}',harborQuizTotal)+'</h2>'
+    +MAP_SVG
+    +'<div style="background:#1a1a2a;border:1px solid '+rc+';border-radius:6px;padding:10px;margin:6px 0;text-align:left">'
+    +'<div style="font-size:clamp(16px,2.2vw,24px);color:'+rc+';font-weight:bold;margin-bottom:4px">'+rt+'</div>'
+    +'<div class="mg-desc">정답: <b style="color:#69f0ae">'+q.opts[q.ans]+'</b></div>'
+    +'<div class="mg-sub" style="margin-top:4px">💡 '+q.hint+'</div></div>'
+    +'<p class="mg-sub">현재: '+harborQuizScore+'/'+(idx+1)+'</p>'
+    +'<button class="btn g" onclick="showHarborQuizQ('+(idx+1)+')">다음 ▶</button>';
+};
+
+function harborQuizEnd(){
+  const perfect=harborQuizScore>=3,good=harborQuizScore>=2;
+  const hasBoat=hasPaperBoat();
+  const canSail=perfect&&hasBoat;
+  const bonus=perfect?60:good?40:20;
+  score+=bonus;
+  localStorage.setItem('ch5_save',JSON.stringify({
+    score,
+    dogType:ch4Save.dogType||'chiwa',
+    strayDog:false,
+    strayDogName:'',
+    dogAdopted,
+    catAbility:inventory.catAbility,
+    catEquipped:PL.catAb,
+    birdAbility:inventory.birdAbility,
+    birdEquipped:PL.birdAb,
+    lifePotion:inventory.lifePotion,
+    shield:inventory.shield,
+    maxHearts,
+    hearts,
+    items:inventory.items,
+    crabDone,sudokuDone,netDone,
+    treasureQuizScore:harborQuizScore,
+    canSail,
+    hasStarMap:hasStarMap(),
+    hasPaperBoat:hasPaperBoat(),
+  }));
+  const achievements=[];
+  if(crabDone)achievements.push('🦀 게잡이');
+  if(sudokuDone)achievements.push('🧩 스도쿠');
+  if(netDone)achievements.push('🪝 그물 수리');
+  if(dogAdopted)achievements.push('🐕 입양');
+  const grandpaLine=canSail
+    ?'"완벽해! 게다가 종이 돛단배까지 있잖아! 이걸 바다에 띄우면... 어떻게 된다고?!"'
+    :perfect
+    ?'"다 맞췄어! 근데 종이 돛단배가 없네... 배가 있어야 보물섬에 갈 수 있는데."'
+    :good
+    ?'"꽤 잘 맞췄어! 보물섬은 동쪽 바다 어딘가에 있어!"'
+    :'"아직 지도를 더 공부해야겠군. 그래도 수고했어!"';
+  const sailingText=canSail
+    ?'<div style="background:#0a2a1a;border:2px solid #69f0ae;border-radius:8px;padding:12px;margin:8px 0;text-align:left;line-height:1.9;font-size:clamp(16px,2.2vw,24px)">'
+      +'<span style="color:#aaa;font-style:italic">(종이 돛단배를 바다에 띄우자... 갑자기 빛을 내며 커지기 시작한다!)</span><br>'
+      +'<span style="color:#69f0ae;font-weight:bold">"이, 이게 뭐야?! 마법의 돛단배였어?!"</span><br>'
+      +'<span style="color:#ffd700">"보물섬으로 출발! ⛵ → 6장으로!"</span></div>'
+    :'';
+  PNL.innerHTML='<h2>🗺️ 퀴즈 완료!</h2>'
+    +'<div style="font-size:32px;margin:4px 0">'+(canSail?'⛵🌟🗺️':perfect?'🌟🗺️🌟':good?'⭐🗺️⭐':'🗺️')+'</div>'
+    +'<div style="background:#1a1a30;border:1px solid #4AA8CC;padding:10px;margin-bottom:8px;text-align:left;line-height:1.9;font-size:clamp(16px,2.2vw,24px)">'
+    +'<span style="color:#aaa;font-style:italic">(할아버지가 지도를 내려놓고 고개를 끄덕인다)</span><br>'
+    +'<span style="color:#eee">'+grandpaLine+'</span></div>'
+    +sailingText
+    +'<div class="mg-hi">맞은 문제: '+harborQuizScore+' / '+harborQuizTotal+' &nbsp; 보너스: +'+bonus+'점!</div>'
+    +(achievements.length?'<p class="mg-sub" style="margin-top:4px">달성: '+achievements.join(' · ')+'</p>':'')
+    +'<p style="color:#ffd700;font-size:clamp(18px,2.5vw,26px);margin-top:6px">최종 점수: <b>'+score+'</b></p>'
+    +'<div class="btn-row" style="margin-top:8px">'
+    +'<button class="btn g" onclick="showLeaderboard()">점수 기록 🏆</button>'
+    +(canSail
+      ?'<button class="btn g" style="background:#69f0ae;color:#111" onclick="goToChapter6()">6장: 보물섬으로! ⛵</button>'
+      :'<button class="btn b" onclick="goToChapter6()">6장으로! →</button>')
+    +'<button class="btn r" onclick="initGame();startGame()">처음부터</button>'
+    +'</div>';
+}
+
+function goToChapter6(){
+  // 최종 ch5_save 갱신 후 6장으로 이동
+  localStorage.setItem('ch5_save',JSON.stringify({
+    score,
+    dogType:ch4Save.dogType||'chiwa',
+    strayDog:false,
+    strayDogName:'',
+    dogAdopted,
+    catAbility:inventory.catAbility,
+    catEquipped:PL.catAb,
+    birdAbility:inventory.birdAbility,
+    birdEquipped:PL.birdAb,
+    lifePotion:inventory.lifePotion,
+    shield:inventory.shield,
+    maxHearts,
+    hearts,
+    items:inventory.items,
+    crabDone,sudokuDone,netDone,
+    treasureQuizScore:harborQuizScore,
+    canSail:true,
+    hasStarMap:hasStarMap(),
+    hasPaperBoat:hasPaperBoat(),
+  }));
+  window.location.href='chapter6.html';
+}
+window.goToChapter6=goToChapter6;
+
+// ── 리더보드 ─────────────────────────────────────
+const LB_KEY='chobaekho_ch5_lb';
+function loadLB(){try{const r=localStorage.getItem(LB_KEY);return r?JSON.parse(r):[];}catch(e){return[];}}
+function saveLB(e){try{localStorage.setItem(LB_KEY,JSON.stringify(e));}catch(e){}}
+function addLBEntry(name,pts){let e=loadLB();const now=new Date();const d=now.getFullYear()+'.'+(now.getMonth()+1).toString().padStart(2,'0')+'.'+now.getDate().toString().padStart(2,'0');e.push({name:name||'익명',score:pts,date:d});e.sort((a,b)=>b.score-a.score);if(e.length>20)e=e.slice(0,20);saveLB(e);return e;}
+function renderLBRows(entries,hi){
+  if(!entries.length)return'<p style="color:#555;font-size:clamp(16px,2.2vw,24px)">아직 기록이 없어요!</p>';
+  return'<table style="width:100%;border-collapse:collapse;border-top:1px solid #333"><tr>'+['순위','이름','점수','날짜'].map(h=>'<th style="color:#888;font-size:clamp(14px,1.8vw,20px);padding:3px">'+h+'</th>').join('')+'</tr>'+entries.map((e,i)=>'<tr style="background:'+(i===hi?'rgba(255,215,0,0.15)':'')+'"><td style="color:#888;font-size:clamp(14px,1.8vw,20px);padding:3px">'+(i===0?'🥇':i===1?'🥈':i===2?'🥉':'#'+(i+1))+'</td><td style="color:'+(i===hi?'#fff':'#ccc')+';font-size:clamp(14px,1.8vw,20px);padding:3px">'+e.name+'</td><td style="color:#ffd700;font-size:clamp(16px,2.2vw,24px);font-weight:bold;padding:3px">'+e.score+'</td><td style="color:#555;font-size:clamp(14px,1.8vw,20px);padding:3px">'+e.date+'</td></tr>').join('')+'</table>';
+}
+window.showLeaderboard=()=>{
+  OV.style.display='flex';const entries=loadLB();
+  PNL.innerHTML='<h2>🏆 점수 기록 (5장)</h2><p style="color:#ffd700">이번 점수: <b>'+score+'</b></p>'
+    +'<div style="margin:8px 0"><input id="lb_name" maxlength="10" placeholder="이름 입력" style="background:#1a1a30;border:2px solid #ffd700;color:#fff;padding:6px 10px;font-size:clamp(16px,2.2vw,24px);font-family:Courier New;width:min(180px,60vw);text-align:center;"></div>'
+    +'<div class="btn-row"><button class="btn g" onclick="submitLB()">기록 등록! 🐾</button><button class="btn b" onclick="skipLB()">그냥 보기</button></div>'
+    +'<div id="lb_list" style="margin-top:8px">'+renderLBRows(entries,-1)+'</div>';
+};
+window.submitLB=()=>{const inp=document.getElementById('lb_name');const name=inp?inp.value.trim():'';const entries=addLBEntry(name,score);const myIdx=entries.findIndex(e=>e.score===score&&e.name===(name||'익명'));const lb=document.getElementById('lb_list');if(lb)lb.innerHTML=renderLBRows(entries,myIdx);const btn=document.querySelector('.btn.g');if(btn){btn.textContent='✅ 등록됨!';btn.disabled=true;}};
+window.skipLB=()=>{const entries=loadLB();PNL.innerHTML='<h2>🏆 리더보드 (5장)</h2>'+renderLBRows(entries,-1)+'<button class="btn g" style="margin-top:8px" onclick="initGame();startGame()">다시 하기!</button>';};
+
+function startGame(){OV.style.display='none';gs='playing';ChoBGM.play(5);}
+window.startGame=startGame;
+
+function loop(){
+  requestAnimationFrame(loop);cx.clearRect(0,0,W,H);frame++;
+  if(gs==='title'){drawTitle();return;}
+  if(gs!=='playing'){drawBG();drawRocks();drawCrabObstacles();drawNPCs();drawPlayer();drawHUD();return;}
+  update();drawBG();drawRocks();drawCrabObstacles();drawNPCs();drawPlayer();drawHUD();
+}
+OV.style.display='none';gs='title';
+initGame();
+loop();
+</script>
+</body>
+</html>

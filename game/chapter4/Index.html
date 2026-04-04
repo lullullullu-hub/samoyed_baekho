@@ -1,0 +1,1602 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>조백호의 여행 - 4장: 산 정상</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:#0d0d1a;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;}
+#wrap{position:relative;width:100vw;max-height:100vh;}
+canvas{display:block;width:100%;height:auto;image-rendering:pixelated;cursor:pointer;}
+#ov{position:fixed;inset:0;background:rgba(0,0,0,0.82);display:none;align-items:center;justify-content:center;z-index:20;}
+.pnl{background:#0e0e1e;border:3px solid #ffd700;padding:clamp(10px,2vw,20px);max-width:min(96vw,900px);width:96%;text-align:center;color:#fff;font-family:'Courier New',monospace;max-height:92vh;overflow-y:auto;touch-action:auto;position:relative;z-index:30;}
+.pnl h2{color:#ffd700;font-size:clamp(22px,4vw,40px);margin-bottom:8px;}
+.pnl p{font-size:clamp(18px,2.5vw,26px);color:#bbb;line-height:1.8;margin-bottom:10px;}
+.btn{background:#ffd700;color:#111;border:none;padding:clamp(9px,1.4vw,18px) clamp(18px,2.7vw,32px);font-size:clamp(18px,2.8vw,32px);cursor:pointer;font-weight:700;margin:3px;font-family:'Courier New',monospace;}
+.btn:hover{background:#ffe94c;}
+.btn.g{background:#69f0ae;color:#111;}
+.btn.b{background:#82b1ff;color:#111;}
+.btn.r{background:#ff5252;color:#fff;}
+.tut-row{display:flex;align-items:center;gap:10px;margin:5px 0;text-align:left;}
+.tut-icon{font-size:clamp(18px,2.5vw,28px);width:clamp(24px,3vw,36px);flex-shrink:0;}
+.tut-text{font-size:clamp(16px,2.2vw,24px);color:#ccc;line-height:1.6;}
+.mg-title{color:#ffd700;font-size:clamp(20px,3.5vw,36px);}
+.mg-desc{color:#fff;font-size:clamp(16px,2.2vw,24px);}
+.mg-sub{color:#aaa;font-size:clamp(14px,1.8vw,20px);}
+.mg-hi{color:#ffd700;font-weight:bold;font-size:clamp(16px,2.2vw,24px);}
+.btn-row{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;}
+</style>
+<script>
+// ═══════════════════════════════════════════════════════
+//  조백호의 여행 - 공통 오디오 엔진 (인라인)
+//  ChoBGM.play(n)/stop()/pause()/resume()
+//  ChoSFX.jump()/npc()/hit()/item()/win()/fail()
+//  ChoAudio.toggleMute()
+// ═══════════════════════════════════════════════════════
+(function(){
+'use strict';
+let _ctx=null;
+function getCtx(){
+  if(!_ctx)_ctx=new(window.AudioContext||window.webkitAudioContext)();
+  if(_ctx.state==='suspended')_ctx.resume();
+  return _ctx;
+}
+['touchstart','mousedown','keydown'].forEach(ev=>document.addEventListener(ev,()=>{if(_ctx&&_ctx.state==='suspended')_ctx.resume();},{passive:true}));
+function pn(freq,type,start,dur,vol,mg){
+  const ctx=getCtx();const o=ctx.createOscillator();const g=ctx.createGain();
+  o.connect(g);g.connect(mg||ctx.destination);
+  o.type=type;o.frequency.setValueAtTime(freq,start);
+  g.gain.setValueAtTime(vol,start);
+  g.gain.exponentialRampToValueAtTime(0.001,start+dur-0.01);
+  o.start(start);o.stop(start+dur);
+}
+const N={
+  A2:110.00,
+  C3:130.81,D3:146.83,E3:164.81,F3:174.61,Fs3:185.00,G3:196.00,A3:220.00,B3:246.94,
+  Cs3:138.59,
+  C4:261.63,D4:293.66,E4:329.63,F4:349.23,Fs4:369.99,G4:392.00,A4:440.00,B4:493.88,
+  Cs4:277.18,Gs4:415.30,
+  C5:523.25,D5:587.33,E5:659.25,F5:698.46,Fs5:739.99,G5:783.99,A5:880.00,B5:987.77,
+  Cs5:554.37,
+  C6:1046.50,D6:1174.66,E6:1318.51,R:0
+};
+
+// 4장 BGM: 몽환적 왈츠 (BPM96, D장조, 3박자)
+const SONGS={
+  4:{bpm:96,tracks:[
+    {type:'square',vol:0.10,notes:[
+      {f:'D5',d:1},{f:'Fs5',d:1},{f:'A5',d:1},
+      {f:'G5',d:1},{f:'Fs5',d:1},{f:'E5',d:1},
+      {f:'Fs5',d:2},{f:'D5',d:1},
+      {f:'E5',d:1},{f:'G5',d:1},{f:'E5',d:1},
+      {f:'D5',d:1},{f:'E5',d:1},{f:'Fs5',d:1},
+      {f:'A5',d:2},{f:'G5',d:1},
+      {f:'Fs5',d:1},{f:'E5',d:1},{f:'D5',d:1},
+      {f:'B5',d:1},{f:'A5',d:1},{f:'G5',d:1},
+      {f:'A5',d:2},{f:'Fs5',d:1},
+      {f:'G5',d:1},{f:'A5',d:1},{f:'B5',d:1},
+      {f:'A5',d:1},{f:'G5',d:1},{f:'Fs5',d:1},
+      {f:'E5',d:2},{f:'D5',d:1},
+      {f:'Fs5',d:1},{f:'E5',d:1},{f:'D5',d:1},
+      {f:'D5',d:3},
+    ]},
+    {type:'triangle',vol:0.065,notes:[
+      {f:'D4',d:1},{f:'Fs4',d:1},{f:'A4',d:1},
+      {f:'G4',d:1},{f:'B4',d:1},{f:'D5',d:1},
+      {f:'A3',d:1},{f:'D4',d:1},{f:'Fs4',d:1},
+      {f:'G3',d:1},{f:'B3',d:1},{f:'D4',d:1},
+      {f:'A3',d:1},{f:'Cs4',d:1},{f:'E4',d:1},
+      {f:'D3',d:1},{f:'Fs3',d:1},{f:'A3',d:1},
+      {f:'G3',d:1},{f:'D4',d:1},{f:'Fs4',d:1},
+      {f:'D3',d:3},
+      {f:'G3',d:1},{f:'B3',d:1},{f:'D4',d:1},
+      {f:'A3',d:1},{f:'D4',d:1},{f:'Fs4',d:1},
+      {f:'G3',d:1},{f:'D4',d:1},{f:'B3',d:1},
+      {f:'A3',d:1},{f:'E4',d:1},{f:'Cs4',d:1},
+      {f:'D3',d:1},{f:'A3',d:1},{f:'Fs3',d:1},
+      {f:'G3',d:1},{f:'D4',d:1},{f:'B3',d:1},
+      {f:'A3',d:3},
+      {f:'D3',d:3},
+    ]},
+    {type:'sawtooth',vol:0.055,notes:[
+      {f:'D3',d:1},{f:'R',d:2},
+      {f:'G3',d:1},{f:'R',d:2},
+      {f:'A3',d:1},{f:'R',d:2},
+      {f:'G3',d:1},{f:'R',d:2},
+      {f:'A3',d:1},{f:'R',d:2},
+      {f:'D3',d:1},{f:'R',d:2},
+      {f:'G3',d:1},{f:'R',d:2},
+      {f:'D3',d:1},{f:'R',d:2},
+      {f:'G3',d:1},{f:'R',d:2},
+      {f:'A3',d:1},{f:'R',d:2},
+      {f:'G3',d:1},{f:'R',d:2},
+      {f:'A3',d:1},{f:'R',d:2},
+      {f:'D3',d:1},{f:'R',d:2},
+      {f:'G3',d:1},{f:'R',d:2},
+      {f:'A3',d:1},{f:'R',d:2},
+      {f:'D3',d:1},{f:'R',d:2},
+    ]},
+  ]},
+};
+
+let _bgmGain=null,_bgmTimer=null,_bgmPaused=false,_bgmChapter=0,_bgmVol=0.38,_muted=false;
+function getBgmGain(){
+  const ctx=getCtx();
+  if(!_bgmGain){_bgmGain=ctx.createGain();_bgmGain.gain.value=_muted?0:_bgmVol;_bgmGain.connect(ctx.destination);}
+  return _bgmGain;
+}
+function stopAllBgm(){if(_bgmTimer){clearTimeout(_bgmTimer);_bgmTimer=null;}}
+function scheduleSong(ch){
+  const song=SONGS[ch];if(!song)return;
+  const ctx=getCtx();const mg=getBgmGain();const beat=60/song.bpm;let loopDur=0;
+  song.tracks.forEach(tr=>{
+    let t=ctx.currentTime+(tr.offset||0);
+    tr.notes.forEach(note=>{
+      const dur=note.d*beat;
+      if(note.f!=='R'&&N[note.f])pn(N[note.f],tr.type,t,dur*.88,tr.vol,mg);
+      t+=dur;
+    });
+    loopDur=Math.max(loopDur,tr.notes.reduce((s,n)=>s+n.d*beat,0));
+  });
+  _bgmTimer=setTimeout(()=>{if(!_bgmPaused&&_bgmChapter===ch)scheduleSong(ch);},(loopDur-.1)*1000);
+}
+const ChoBGM={
+  play(ch){stopAllBgm();_bgmPaused=false;_bgmChapter=ch;if(_ctx&&_ctx.state==='suspended')_ctx.resume();scheduleSong(ch);},
+  stop(){stopAllBgm();_bgmChapter=0;_bgmPaused=false;},
+  pause(){if(_bgmPaused)return;_bgmPaused=true;stopAllBgm();},
+  resume(){if(!_bgmPaused||!_bgmChapter)return;_bgmPaused=false;scheduleSong(_bgmChapter);},
+  setVolume(v){_bgmVol=Math.max(0,Math.min(1,v));if(_bgmGain)_bgmGain.gain.value=_muted?0:_bgmVol;},
+};
+let _sfxGain=null,_sfxVol=0.55;
+function getSfxGain(){
+  const ctx=getCtx();
+  if(!_sfxGain){_sfxGain=ctx.createGain();_sfxGain.gain.value=_muted?0:_sfxVol;_sfxGain.connect(ctx.destination);}
+  return _sfxGain;
+}
+function playSfxSeq(seq){
+  const ctx=getCtx();const g=getSfxGain();let t=ctx.currentTime;
+  seq.forEach(([freq,type,dur,vol])=>{if(freq>0)pn(freq,type,t,dur,vol,g);t+=dur;});
+}
+const ChoSFX={
+  jump(){playSfxSeq([[N.C5,'square',.055,.22],[N.E5,'square',.055,.20],[N.G5,'square',.055,.18],[N.C6,'square',.08,.16]]);},
+  npc(){playSfxSeq([[N.G5,'triangle',.07,.20],[N.C6,'triangle',.07,.20],[N.E6,'triangle',.12,.22]]);},
+  hit(){playSfxSeq([[N.A4,'sawtooth',.05,.20],[N.Gs4,'sawtooth',.05,.18],[N.Fs4,'sawtooth',.05,.16],[N.E4,'sawtooth',.12,.18]]);},
+  item(){playSfxSeq([[N.E5,'triangle',.06,.18],[N.G5,'triangle',.06,.18],[N.C6,'triangle',.06,.18],[N.E6,'triangle',.10,.20]]);},
+  win(){playSfxSeq([[N.C5,'square',.07,.20],[N.E5,'square',.07,.20],[N.G5,'square',.07,.20],[N.C6,'square',.18,.28],[N.E6,'square',.22,.24]]);},
+  fail(){playSfxSeq([[N.A4,'sawtooth',.10,.18],[N.G4,'sawtooth',.10,.16],[N.E4,'sawtooth',.10,.15],[N.C4,'sawtooth',.22,.18]]);},
+  setVolume(v){_sfxVol=Math.max(0,Math.min(1,v));if(_sfxGain)_sfxGain.gain.value=_muted?0:_sfxVol;}
+};
+const ChoAudio={
+  toggleMute(){_muted=!_muted;if(_bgmGain)_bgmGain.gain.value=_muted?0:_bgmVol;if(_sfxGain)_sfxGain.gain.value=_muted?0:_sfxVol;return _muted;},
+  get muted(){return _muted;}
+};
+window.ChoBGM=ChoBGM;window.ChoSFX=ChoSFX;window.ChoAudio=ChoAudio;
+})();
+</script>
+</head>
+<body>
+<div id="wrap">
+  <canvas id="c" width="800" height="416"></canvas>
+  <div id="ov"><div class="pnl" id="pnl"></div></div>
+</div>
+<script>
+const CV=document.getElementById('c'),cx=CV.getContext('2d');
+cx.imageSmoothingEnabled=false;
+const OV=document.getElementById('ov'),PNL=document.getElementById('pnl');
+const W=800,H=416,FL=370,PS=3,WORLD=5000;
+
+// ── 팔레트 ────────────────────────────────────────
+const PAL={'.':null,'W':'#FFFFFF','w':'#F2F0E8','L':'#D0D0C0','B':'#000000','b':'#222222',
+  'P':'#FFB8C8','p':'#E07090','G':'#5A8A3A','g':'#3A6A20','R':'#888880','r':'#666660',
+  'K':'#C8B890','k':'#A89870','T':'#4A3020','t':'#2A1810','F':'#FFB7C5','f':'#FF85A0',
+  'H':'#F2C06A','h':'#C89040','Y':'#FFD020','y':'#B09000','N':'#8B6914','n':'#5A4008',
+  'Z':'#484848','z':'#2A2A2A','S':'#C07030','s':'#A05020',
+  'E':'#228844','e':'#116622','I':'#88CCFF','i':'#4499CC',
+  'X':'#A0C8E0','x':'#608090',
+};
+function spr(data,sx,sy,flip){
+  const cols=data[0].length;
+  data.forEach((row,ry)=>[...row].forEach((c,rx)=>{
+    if(!PAL[c])return;
+    const dx=flip?sx+(cols-1-rx)*PS:sx+rx*PS;
+    cx.fillStyle=PAL[c];cx.fillRect(dx,sy+ry*PS,PS,PS);
+  }));
+}
+function fillR(x,y,w,h,col){cx.fillStyle=col;cx.fillRect(x,y,w,h);}
+
+// ── 백호 스프라이트 ─────────────────────────────
+const D_RUN1=['..PPWWWWPP..','.WWWWWWWWWWW','WWWWWWWWWWWW','W.BB.WW.BB.W','WWWWWWWWWWWW','WWWWLLLLWWWW','WWWWLBBLwwww','WWWWWWWWWWWW','.WWWWWWWWWWW','.WWWWWWWWWWW','.WWWWWWWWWWW','..WWWWWWWWWW','..WW.WW.WW..','..WW.WW.WW..'];
+const D_RUN2=['..PPWWWWPP..','.WWWWWWWWWWW','WWWWWWWWWWWW','W.BB.WW.BB.W','WWWWWWWWWWWW','WWWWLLLLWWWW','WWWWLBBLwwww','WWWWWWWWWWWW','.WWWWWWWWWWW','.WWWWWWWWWWW','.WWWWWWWWWWW','..WWWWWWWWWW','...WW.WW.WW.','...WW.WW.WW.'];
+const D_JMP=['..PPWWWWPP..','.WWWWWWWWWWW','WWWWWWWWWWWW','W.BB.WW.BB.W','WWWWWWWWWWWW','WWWWLLLLWWWW','WWWWLBBLwwww','WWWWWWWWWWWW','.WWWWWWWWWWW','..WWWWWWWWWW','..WWWWWWWWWW','.WW.WWWWWWWW','WW....WWWWWW','............'];
+
+// ── 뱀 스프라이트 (동그랗게 말린 산뱀, 초록) ──────
+const SNAKE_PAL={
+  'G':'#3A8A30','g':'#2A6A20','D':'#1A4A10',
+  'Y':'#88CC44','y':'#66AA22',
+  'R':'#CC2222',
+  '.':null
+};
+const SNAKE_SPR=[
+  '....GGGGG...',
+  '...GgggggG..',
+  '..GgDDDDgGG.',
+  '.GgD....DgYG',
+  '.GD.GGGG.DYG',
+  '.GD.GyyG.DYG',
+  '.GgD.GG.DgYG',
+  '..GgDDDDgGG.',
+  '...GgggGGR..',
+  '....GGGR....',
+];
+function sprSnake(sx,sy){
+  SNAKE_SPR.forEach((row,ry)=>[...row].forEach((c,rx)=>{
+    if(!SNAKE_PAL[c])return;
+    cx.fillStyle=SNAKE_PAL[c];cx.fillRect(sx+rx*PS,sy+ry*PS,PS,PS);
+  }));
+}
+
+// ── 바위 스프라이트 ──────────────────────────────
+
+
+// ── 진돗개 (들개) 스프라이트 ─────────────────────
+const JINDO_PAL={
+  'D':'#D4A058','d':'#B08040','e':'#7A5010',
+  'B':'#000000','n':'#333333','p':'#CC8840',
+  'W':'#FFFFFF','.':null
+};
+const JINDO_RUN1=[
+  '....DD......','...DdD......','..DD.DDDDDD.','.DD..DDDDDDd',
+  'DdD..DDDDDDD','D.B..DDnDDDD','DDDD.DDDDDDD','.DDDDDDDDDDD',
+  '..DDDDDDDDD.','..DD....DDDD','..DD....DD..','.eeD....Dee.','.ee......ee.','............',
+];
+const JINDO_RUN2=[
+  '....DD......','...DdD......','..DD.DDDDDD.','.DD..DDDDDDd',
+  'DdD..DDDDDDD','D.B..DDnDDDD','DDDD.DDDDDDD','.DDDDDDDDDDD',
+  '..DDDDDDDDD.','..DDDD..DDDD','...DD...DD..','..eeD...Dee.','..ee.....ee.','............',
+];
+const JINDO_JMP=[
+  '....DD......','...DdD......','..DD.DDDDDD.','.DD..DDDDDDd',
+  'DdD..DDDDDDD','D.B..DDnDDDD','DDDD.DDDDDDD','.DDDDDDDDDDD',
+  '..DDDDDDDDD.','..eeDDDDDee.','....e..e....','............','............','............',
+];
+function sprJindo(data,sx,sy,flip){
+  const cols=data[0].length;
+  data.forEach((row,ry)=>[...row].forEach((c,rx)=>{
+    if(!JINDO_PAL[c])return;
+    const dx=flip?sx+(cols-1-rx)*PS:sx+rx*PS;
+    cx.fillStyle=JINDO_PAL[c];cx.fillRect(dx,sy+ry*PS,PS,PS);
+  }));
+}
+
+// ── 지형 높이 계산 (4장: 하산하는 느낌) ──────────
+function getGroundY(worldX){
+  const base=FL;
+  // 정상 부분(0~500)은 평탄, 이후 서서히 내려감
+  const descent=Math.min(worldX/4000,1)*60;
+  const h1=Math.sin(worldX*0.003)*18;
+  const h2=Math.sin(worldX*0.007+1.0)*10;
+  const h3=Math.sin(worldX*0.015+2.0)*5;
+  return base-descent+h1+h2+h3;
+}
+
+// ── 전역 상태 ─────────────────────────────────────
+let gs='title',frame=0,cam=0,hearts=5,maxHearts=5,score=0;
+let snakes=[],snowflakes=[],popups=[],windParticles=[];
+let jumpBanTimer=0;
+let inventory={lifePotion:0,shield:0,items:[],catAbility:false,birdAbility:false};
+let hasInvincible=false,invincibleTimer=0;
+let hasBag=true;
+const pauseBtnRect={x:W-60,y:6,w:52,h:36};
+const MB={left:{x:14,y:H-80,w:64,h:60},right:{x:84,y:H-80,w:64,h:60},jump:{x:W-100,y:H-86,w:88,h:72}};
+function inBtn(btn,tx,ty){return tx>=btn.x&&tx<=btn.x+btn.w&&ty>=btn.y&&ty<=btn.y+btn.h;}
+
+// ── ch3 세이브 인계 ────────────────────────────
+let ch3Save={};
+let strayDogName='',strayDogHas=false;
+let axeItems=[];   // [{axeType:'gold'|'silver'|'iron', name, icon}]
+
+// ── NPC 상태 ──────────────────────────────────────
+let windNPC=null,collectNPC=null,coldNPC=null,dogEventNPC=null,axeEventNPC=null,descentNPC=null;
+let windDone=false,collectDone=false,coldDone=false,dogEventDone=false,axeEventDone=false;
+let compassGot=false,boxGot=false;
+
+// ── 동행 들개 ─────────────────────────────────────
+let strayDogCompanion={active:false,x:0,wf:0,wt:0,name:''};
+
+// ── 플레이어 ──────────────────────────────────────
+const PL={x:120,y:FL-42,vy:0,vx:0,w:36,h:42,ground:false,wf:0,wt:0,inv:0,dj:false,catAb:false,birdAb:false,birdBoosts:0};
+const JUMP_V=-10.0,GRAV=0.52,SPD=4.0;
+
+// ── initGame ──────────────────────────────────────
+function initGame(){
+  try{ch3Save=JSON.parse(localStorage.getItem('ch3_save')||'{}');}catch(e){ch3Save={};}
+  strayDogHas=!!(ch3Save.strayDog);
+  strayDogName=ch3Save.strayDogName||'개돌이';
+  axeItems=(ch3Save.items||[]).filter(it=>it.axeType);
+  inventory={
+    lifePotion:ch3Save.lifePotion||0,
+    shield:ch3Save.shield||0,
+    items:(ch3Save.items||[]).filter(it=>!it.ch3only&&!it.axeType),
+    catAbility:!!(ch3Save.catAbility),
+    birdAbility:!!(ch3Save.birdAbility),
+  };
+  maxHearts=ch3Save.maxHearts||5;
+  hearts=Math.min(ch3Save.hearts||5,maxHearts);
+
+  Object.assign(PL,{x:120,y:FL-42,vy:0,vx:0,ground:false,wf:0,wt:0,inv:0,dj:false,catAb:!!(ch3Save.catEquipped),birdAb:false});
+  score=ch3Save.score||0;  // 점수 누적
+  cam=0;frame=0;popups=[];
+  hasInvincible=false;invincibleTimer=0;
+
+  // 들개 동행 복원
+  strayDogCompanion={active:strayDogHas,x:PL.x-80,wf:0,wt:0,name:strayDogName};
+
+  // 봄 바람 꽃잎 파티클
+  snowflakes=Array.from({length:55},()=>({
+    x:Math.random()*W,y:Math.random()*H*.8,
+    vx:-0.6-Math.random()*2.0,vy:-0.1+Math.random()*0.6,
+    wb:Math.random()*Math.PI*2,r:2+Math.random()*3,
+    op:0.5+Math.random()*0.4,
+    c:Math.random()<.6?'#FFB7C5':Math.random()<.5?'#FFD0E0':'#FF9AB8',
+  }));
+  // 바람 파티클
+  windParticles=[];
+
+  // 뱀 배치
+  snakes=[];let snx=350;
+  while(snx<WORLD-400){
+    snx+=220+Math.floor(Math.random()*320);
+    snakes.push({x:snx,used:false,wb:Math.random()*Math.PI*2});
+    if(Math.random()<0.18){snakes.push({x:snx+90+Math.floor(Math.random()*50),used:false,wb:Math.random()*Math.PI*2});snx+=100;}
+  }
+  jumpBanTimer=0;
+
+  // 바위
+
+  // NPC 트리거 위치
+  windNPC={x:600,met:false};
+  collectNPC={x:1400,met:false};
+  coldNPC={x:2200,met:false};
+  dogEventNPC={x:2900,met:false};
+  axeEventNPC={x:3500,met:false};
+  descentNPC={x:4400,met:false};
+
+  windDone=false;collectDone=false;coldDone=false;
+  dogEventDone=false;axeEventDone=false;
+  compassGot=false;boxGot=false;
+}
+
+// ── 입력 ─────────────────────────────────────────
+const keys={},mobileKeys={left:false,right:false,jump:false};
+document.addEventListener('keydown',e=>{
+  keys[e.code]=true;
+  ['Space','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.code)&&e.preventDefault();
+  if(gs==='title'&&(e.code==='Space'||e.code==='Enter'))showTutorial();
+  else if(gs==='howto'&&(e.code==='Space'||e.code==='Enter'))nextTut();
+  else if(gs==='playing'){
+    if(e.code==='Space'||e.code==='ArrowUp')doJump();
+    if(e.code==='KeyP')togglePause();
+    if(e.code==='KeyB')toggleInv();
+  }
+  else if(gs==='paused'&&e.code==='KeyP')togglePause();
+  else if(gs==='inv'&&e.code==='KeyB')toggleInv();
+});
+document.addEventListener('keyup',e=>{keys[e.code]=false;});
+CV.addEventListener('click',e=>{
+  const r=CV.getBoundingClientRect();
+  const tx=(e.clientX-r.left)*(W/r.width),ty=(e.clientY-r.top)*(H/r.height);
+  if(tx>=W-72&&tx<=W-28&&ty>=46&&ty<=66){ChoAudio.toggleMute();return;}
+  if(gs==='title'){showTutorial();return;}
+  if(gs==='howto'){nextTut();return;}
+  if(gs==='playing'){if(inBtn(pauseBtnRect,tx,ty)){togglePause();return;}if(tx>W*.35)doJump();}
+});
+CV.addEventListener('touchstart',e=>{
+  if(OV.style.display==='flex')return;
+  e.preventDefault();
+  const r=CV.getBoundingClientRect();
+  const t0=e.changedTouches[0];
+  const tx=(t0.clientX-r.left)*(W/r.width),ty=(t0.clientY-r.top)*(H/r.height);
+  if(gs==='title'){showTutorial();return;}
+  if(gs==='howto'){nextTut();return;}
+  if(gs==='playing'){if(inBtn(pauseBtnRect,tx,ty)){togglePause();return;}updateMobileKeys(e);}
+},{passive:false});
+CV.addEventListener('touchmove',e=>{if(OV.style.display==='flex')return;e.preventDefault();if(gs==='playing')updateMobileKeys(e);},{passive:false});
+CV.addEventListener('touchend',e=>{
+  if(OV.style.display==='flex')return;e.preventDefault();
+  if(gs==='playing'){const pts=getTouches(e);mobileKeys.left=pts.some(p=>inBtn(MB.left,p.x,p.y));mobileKeys.right=pts.some(p=>inBtn(MB.right,p.x,p.y));mobileKeys.jump=pts.some(p=>inBtn(MB.jump,p.x,p.y));}
+},{passive:false});
+function getTouches(e){const r=CV.getBoundingClientRect();return Array.from(e.touches).map(t=>({x:(t.clientX-r.left)*(W/r.width),y:(t.clientY-r.top)*(H/r.height)}));}
+function updateMobileKeys(e){const pts=getTouches(e);mobileKeys.left=pts.some(p=>inBtn(MB.left,p.x,p.y));mobileKeys.right=pts.some(p=>inBtn(MB.right,p.x,p.y));const jn=pts.some(p=>inBtn(MB.jump,p.x,p.y));if(jn&&!mobileKeys.jump)doJump();mobileKeys.jump=jn;}
+
+function doJump(){
+  if(jumpBanTimer>0)return;
+  if(PL.birdAb){PL.vy=Math.max(-20,PL.vy-7);PL.ground=false;PL.dj=false;ChoSFX.jump();}
+  else if(PL.ground){PL.vy=JUMP_V;PL.ground=false;PL.dj=false;ChoSFX.jump();}
+  else if(PL.catAb&&!PL.dj){PL.vy=JUMP_V*.85;PL.dj=true;}
+}
+
+// ── UPDATE ───────────────────────────────────────
+function update(){
+  if(gs!=='playing')return;
+  // 오른쪽 이동 + 자동전진 (왼쪽 이동 없음)
+  const MIN_VX=1.0; // 자동 최소 전진 속도
+  if(keys['ArrowRight']||keys['KeyD']||mobileKeys.right)PL.vx=Math.min(PL.vx+.9,SPD);
+  else PL.vx*=.80;
+  if(PL.vx<MIN_VX)PL.vx=MIN_VX; // 자동전진
+  PL.vy+=GRAV;PL.x+=PL.vx;PL.y+=PL.vy;
+  const groundY=getGroundY(PL.x+18);
+  const fy=groundY-PL.h;
+  if(PL.y>=fy){PL.y=fy;PL.vy=0;PL.ground=true;PL.dj=false;}else PL.ground=false;
+  if(PL.y<8)PL.y=8;
+  const curGY=getGroundY(PL.x+18)-PL.h;
+  if(PL.y>curGY&&PL.vy>=0){PL.y=curGY;PL.vy=0;PL.ground=true;PL.dj=false;}
+  cam=Math.max(0,Math.min(PL.x-W*.32,WORLD-W));PL.x=Math.max(cam+40,PL.x);
+  if(PL.ground&&Math.abs(PL.vx)>.5){PL.wt++;if(PL.wt>6){PL.wt=0;PL.wf=(PL.wf+1)%4;}}
+  if(PL.inv>0)PL.inv--;
+  if(jumpBanTimer>0)jumpBanTimer--;
+  if(invincibleTimer>0){invincibleTimer--;if(invincibleTimer===0)hasInvincible=false;}
+
+  // 들개 동행
+  if(strayDogCompanion.active){
+    const stx=PL.x-80;strayDogCompanion.x+=(stx-strayDogCompanion.x)*.12;
+    strayDogCompanion.wt=(strayDogCompanion.wt||0)+1;
+    if(strayDogCompanion.wt>7){strayDogCompanion.wt=0;strayDogCompanion.wf=(strayDogCompanion.wf+1)%4;}
+  }
+
+  // 봄 바람 꽃잎
+  snowflakes.forEach(p=>{
+    p.x+=p.vx;p.y+=p.vy;p.wb+=.06;
+    p.x+=Math.sin(p.wb*.7)*1.2;
+    p.y+=Math.cos(p.wb*.5)*.4;
+    if(p.x<-20)p.x=W+20;
+    if(p.y>H+10){p.y=-10;p.x=Math.random()*W;}
+    if(p.y<-20){p.y=H*.8;p.x=Math.random()*W;}
+  });
+
+  // 바람 줄기 파티클 스폰+업데이트
+  if(frame%10===0){
+    windParticles.push({
+      x:W+10,y:10+Math.random()*(H-60),
+      vx:-(2.5+Math.random()*3.5),dy:(Math.random()-.5)*1.5,
+      len:25+Math.random()*55,life:70,maxLife:70
+    });
+  }
+  windParticles.forEach(w=>{w.x+=w.vx;w.life--;});
+  windParticles=windParticles.filter(w=>w.life>0&&w.x>-80);
+
+  // 충돌 판정 (뱀 → 바위 순서, 피격 시 즉시 중단)
+  if(PL.inv===0&&!hasInvincible){
+    let hit=false;
+    // 뱀 충돌 (HP-1 + 점프금지)
+    for(const s of snakes){
+      if(s.used)continue;
+      const sx=s.x-cam;
+      const sColY=getGroundY(s.x);
+      if(PL.x-cam+PL.w-8>sx+4&&PL.x-cam+8<sx+36&&PL.y+PL.h>sColY-28&&PL.y<sColY){
+        s.used=true;hearts=Math.max(0,hearts-1);PL.inv=80;jumpBanTimer=60;hit=true;ChoSFX.hit();
+        popups.push({x:PL.x,y:PL.y,t:'-1 🐍 점프금지!',c:'#ff5252',life:80});
+        if(hearts<=0){gs='over';showPanel('over');}
+        break;
+      }
+    }
+  }
+
+  // NPC 트리거
+  if(windNPC&&!windNPC.met&&PL.x>windNPC.x-80){windNPC.met=true;ChoSFX.npc();showWindIntro();}
+  if(collectNPC&&!collectNPC.met&&PL.x>collectNPC.x-80){collectNPC.met=true;ChoSFX.npc();showCollectIntro();}
+  if(coldNPC&&!coldNPC.met&&PL.x>coldNPC.x-80){coldNPC.met=true;ChoSFX.npc();showColdIntro();}
+  if(dogEventNPC&&!dogEventNPC.met&&PL.x>dogEventNPC.x-80){dogEventNPC.met=true;if(strayDogHas){ChoSFX.npc();showDogEventIntro();}}
+  if(axeEventNPC&&!axeEventNPC.met&&PL.x>axeEventNPC.x-80){axeEventNPC.met=true;ChoSFX.npc();showAxeEventIntro();}
+  if(descentNPC&&!descentNPC.met&&PL.x>descentNPC.x-80){descentNPC.met=true;ChoSFX.npc();showDescentIntro();}
+
+  popups=popups.filter(p=>{p.life--;p.y-=.5;return p.life>0;});
+}
+
+// ── 배경 그리기 ──────────────────────────────────
+function drawBG(){
+  // 봄 밤하늘 (진남색~보라)
+  const grd=cx.createLinearGradient(0,0,0,H*.6);
+  grd.addColorStop(0,'#0a0a20');
+  grd.addColorStop(.4,'#1a1040');
+  grd.addColorStop(1,'#2a1a50');
+  cx.fillStyle=grd;cx.fillRect(0,0,W,H);
+
+  // 달
+  const moonX=680,moonY=48;
+  const moonGlow=cx.createRadialGradient(moonX,moonY,0,moonX,moonY,55);
+  moonGlow.addColorStop(0,'rgba(255,240,180,0.18)');
+  moonGlow.addColorStop(1,'rgba(255,240,180,0)');
+  cx.fillStyle=moonGlow;cx.beginPath();cx.arc(moonX,moonY,55,0,Math.PI*2);cx.fill();
+  cx.fillStyle='#FFF8DC';cx.beginPath();cx.arc(moonX,moonY,22,0,Math.PI*2);cx.fill();
+  cx.fillStyle='#F0E890';cx.beginPath();cx.arc(moonX-4,moonY-3,18,0,Math.PI*2);cx.fill();
+
+  // 별
+  [[50,28],[130,50],[220,18],[370,42],[510,22],[660,50],[760,28],[400,12],[180,38],[580,35],
+   [90,15],[300,35],[450,28],[720,40],[160,55],[540,48]].forEach(([x,y])=>{
+    const tw=Math.sin(frame*.04+x*.05)*0.4+0.6;
+    cx.globalAlpha=tw*.75;cx.fillStyle='#fff';
+    cx.beginPath();cx.arc(x,y,1.2,0,Math.PI*2);cx.fill();
+  });
+  cx.globalAlpha=1;
+
+  // 원거리 산 실루엣 (봄 녹색 능선)
+  cx.fillStyle='#1a2a18';
+  cx.beginPath();cx.moveTo(0,H);
+  cx.lineTo(0,270);cx.bezierCurveTo(150,215,280,240,400,200);
+  cx.bezierCurveTo(520,160,650,190,800,210);
+  cx.lineTo(W,H);cx.closePath();cx.fill();
+
+  // 중거리 능선 (패럴랙스 0.3)
+  const mid=cam*.3;
+  cx.fillStyle='#223020';
+  cx.beginPath();cx.moveTo(0,H);cx.moveTo(0,325);
+  for(let x=0;x<=W+40;x+=10){const wx=x+mid;cx.lineTo(x,325+Math.sin(wx*.005)*18+Math.cos(wx*.009)*10);}
+  cx.lineTo(W,H);cx.lineTo(0,H);cx.closePath();cx.fill();
+
+  // 벚나무 (봄 밤, 분홍 꽃 가득)
+  const to=cam*.65;
+  for(let tx=60;tx<WORLD;tx+=90+Math.floor(Math.abs(Math.sin(tx*.07))*60)){
+    const sx=tx-to;if(sx<-80||sx>W+80)continue;
+    const gy=getGroundY(tx);
+    const sizeR=.7+Math.abs(Math.sin(tx*.17))*.6;
+    const th=Math.floor((44+Math.abs(Math.sin(tx*.3))*36)*sizeR);
+    const tr=Math.floor((14+Math.abs(Math.sin(tx*.5))*13)*sizeR);
+    fillR(sx-2,gy-th,Math.max(4,5*sizeR),th,'#4A2818');
+    const pinkShades=['#FFB7C5','#FF9AB8','#FFD0E0'];
+    for(let layer=0;layer<3;layer++){
+      const ly=gy-th*.45-layer*th*.2;
+      const lr=tr*(1.15-layer*.28);
+      cx.fillStyle=pinkShades[layer];
+      cx.beginPath();cx.arc(sx,ly,lr,0,Math.PI*2);cx.fill();
+      cx.beginPath();cx.arc(sx-lr*.55,ly+lr*.25,lr*.7,0,Math.PI*2);cx.fill();
+      cx.beginPath();cx.arc(sx+lr*.55,ly+lr*.2,lr*.68,0,Math.PI*2);cx.fill();
+    }
+    cx.fillStyle='rgba(255,248,220,0.15)';
+    cx.beginPath();cx.arc(sx+tr*.3,gy-th*.7,tr*.4,0,Math.PI*2);cx.fill();
+  }
+
+  // 벚꽃잎 파티클
+  snowflakes.forEach(p=>{
+    cx.globalAlpha=p.op;
+    cx.fillStyle=p.c||'#FFB7C5';
+    cx.save();cx.translate(p.x,p.y);cx.rotate(p.wb);
+    cx.beginPath();cx.ellipse(0,0,p.r*1.6,p.r*.8,0,0,Math.PI*2);cx.fill();
+    cx.restore();
+  });
+  cx.globalAlpha=1;
+
+  // 바람 줄기
+  windParticles.forEach(w=>{
+    cx.globalAlpha=w.life/w.maxLife*0.18;
+    cx.strokeStyle='rgba(200,230,200,0.6)';cx.lineWidth=1;
+    cx.beginPath();cx.moveTo(w.x,w.y);cx.lineTo(w.x+w.len,w.y+w.dy);cx.stroke();
+  });
+  cx.globalAlpha=1;
+
+  // 지형 지면 (봄 산 흙+풀)
+  cx.beginPath();cx.moveTo(0,H);
+  for(let x=0;x<=W;x+=4){cx.lineTo(x,getGroundY(x+cam));}
+  cx.lineTo(W,H);cx.closePath();
+  const gfill=cx.createLinearGradient(0,FL-80,0,H);
+  gfill.addColorStop(0,'#4a6a30');gfill.addColorStop(.12,'#3a5228');gfill.addColorStop(1,'#2a3a18');
+  cx.fillStyle=gfill;cx.fill();
+
+  // 지면 풀 라인
+  cx.beginPath();cx.moveTo(0,getGroundY(cam));
+  for(let x=0;x<=W;x+=4){cx.lineTo(x,getGroundY(x+cam));}
+  cx.lineTo(W,getGroundY(W+cam)+2);cx.lineTo(0,getGroundY(cam)+2);cx.closePath();
+  cx.fillStyle='rgba(100,180,60,0.35)';cx.fill();
+
+  // 지면 윤곽선
+  cx.strokeStyle='rgba(80,160,40,0.5)';cx.lineWidth=2;
+  cx.beginPath();cx.moveTo(0,getGroundY(cam));
+  for(let x=0;x<=W;x+=4){cx.lineTo(x,getGroundY(x+cam));}
+  cx.stroke();
+}
+
+// ── 뱀 그리기 ────────────────────────────────────
+function drawSnakes(){
+  snakes.forEach(s=>{
+    if(s.used)return;
+    const sx=s.x-cam;if(sx<-40||sx>W+40)return;
+    const sgy=getGroundY(s.x);
+    s.wb+=0.04;
+    const bob=Math.sin(s.wb)*1.5;
+    sprSnake(sx-2,sgy-30+bob);
+    cx.fillStyle='#DD2222';
+    cx.fillRect(sx+16,sgy-32+bob,2,4);
+    cx.fillRect(sx+14,sgy-29+bob,2,2);
+    cx.fillRect(sx+18,sgy-29+bob,2,2);
+  });
+}
+
+
+// ── NPC 그리기 ───────────────────────────────────
+function drawBubble(x,y,w,txt){
+  cx.fillStyle='rgba(255,255,220,.92)';cx.fillRect(x,y,w,14);
+  cx.strokeStyle='#aaa';cx.lineWidth=1;cx.strokeRect(x,y,w,14);
+  cx.fillStyle='#444';cx.font='9px Courier New';cx.textAlign='left';cx.fillText(txt,x+3,y+11);
+}
+
+function drawNPCs(){
+  // 이벤트 아이콘 표시 (아직 안 만난 NPC만)
+  const npcs=[
+    {npc:windNPC,done:windDone,icon:'🌬️',label:'강풍!'},
+    {npc:collectNPC,done:collectDone,icon:'⭐',label:'별자리!'},
+    {npc:coldNPC,done:coldDone,icon:'🥶',label:'추위!'},
+    {npc:dogEventNPC,done:dogEventDone,icon:'🐕',label:'들개!'},
+    {npc:axeEventNPC,done:axeEventDone,icon:'🪓',label:'바위!'},
+    {npc:descentNPC,done:false,icon:'🏔️',label:'하산!'},
+  ];
+  npcs.forEach(({npc,done,icon,label})=>{
+    if(!npc||npc.met)return;
+    const sx=npc.x-cam;if(sx<-80||sx>W+80)return;
+    const gy=getGroundY(npc.x);
+    cx.font='22px serif';cx.textAlign='center';cx.fillText(icon,sx+11,gy-20);
+    if(Math.abs(PL.x-npc.x)<200)drawBubble(sx-18,gy-44,70,label);
+  });
+
+  // 들개 동행
+  if(strayDogCompanion.active){
+    const dx=strayDogCompanion.x-cam;if(dx>-40&&dx<W+40){
+      const dgy=getGroundY(strayDogCompanion.x);
+      const sp=strayDogCompanion.wf<2?JINDO_RUN1:JINDO_RUN2;
+      sprJindo(sp,dx,dgy-42,false);
+    }
+  }
+
+  // 특수 바위 (도끼 이벤트, 들개가 함께이고 아직 안 한 경우)
+  if(axeItems.length>0&&!axeEventDone&&axeEventNPC&&axeEventNPC.met===false){
+    const sx=axeEventNPC?axeEventNPC.x-cam:0;
+    if(sx>-80&&sx<W+80){
+      const gy=getGroundY(axeEventNPC.x);
+      // 빛나는 특수 바위
+      const glow=0.3+Math.sin(frame*.08)*.2;
+      cx.globalAlpha=glow;
+      cx.fillStyle='#ffd700';
+      cx.beginPath();cx.arc(sx+11,gy-20,18,0,Math.PI*2);cx.fill();
+      cx.globalAlpha=1;
+      
+    }
+  }
+}
+
+// ── 플레이어 그리기 ───────────────────────────────
+function drawPlayer(){
+  const ppx=PL.x-cam,ppy=PL.y;
+  const blink=PL.inv>0&&Math.floor(PL.inv/7)%2===1;
+  if(blink)cx.globalAlpha=0.35;
+  cx.globalAlpha*=0.28;cx.fillStyle='#000';const shadowGY=getGroundY(PL.x+18);cx.beginPath();cx.ellipse(ppx+18,shadowGY+4,16,5,0,0,Math.PI*2);cx.fill();
+  cx.globalAlpha=blink?0.35:1;
+  const tw=PL.ground&&Math.abs(PL.vx)>.5?Math.sin(PL.wf*Math.PI/2)*2:0;
+  [[-PS,9*PS],[-PS,8*PS],[-2*PS,7*PS],[-2*PS,6*PS],[-3*PS,5*PS+tw],[-2*PS,4*PS],[-PS,3*PS],[0,2*PS]].forEach(([dx,dy])=>{cx.fillStyle='#F2F0E8';cx.fillRect(ppx+dx,ppy+dy,PS,PS);});
+  cx.globalAlpha=blink?0.35:1;
+  spr(PL.ground&&Math.abs(PL.vx)>.5?(PL.wf<2?D_RUN1:D_RUN2):D_JMP,ppx,ppy);
+  cx.globalAlpha=1;
+}
+
+// ── HUD ───────────────────────────────────────────
+function drawHUD(){
+  const hbw=14+maxHearts*34-14+20;fillR(8,8,hbw,34,'rgba(0,0,0,.5)');
+  for(let i=0;i<maxHearts;i++){
+    const v=hearts-i,hx=14+i*34;
+    [[4,0,8,3],[2,3,12,3],[0,6,16,3],[0,9,16,3],[2,12,12,3],[4,15,8,3],[6,18,4,3]].forEach(([ox,oy,w2,h2])=>{
+      cx.fillStyle=v>=1?'#FF3850':v>=.5?(ox<8?'#FF3850':'#444'):'#333';cx.fillRect(hx+ox,14+oy,w2,h2);
+    });
+  }
+  fillR(W-218,8,110,34,'rgba(0,0,0,.5)');
+  cx.fillStyle='#FFD700';cx.font='bold 14px Courier New';cx.textAlign='right';cx.fillText(String(score).padStart(6,'0'),W-114,30);
+  const pb=pauseBtnRect;fillR(pb.x,pb.y,pb.w,pb.h,'rgba(0,0,0,0.72)');
+  cx.strokeStyle='#FFD700';cx.lineWidth=2;cx.strokeRect(pb.x,pb.y,pb.w,pb.h);
+  cx.fillStyle='#FFD700';cx.font='bold 15px Courier New';cx.textAlign='center';cx.fillText('❚❚',pb.x+pb.w/2,pb.y+17);
+  cx.fillStyle='rgba(255,215,0,0.75)';cx.font='bold 9px Courier New';cx.fillText('PAUSE',pb.x+pb.w/2,pb.y+30);
+  
+  if(jumpBanTimer>0){const bar=jumpBanTimer/60;fillR(PL.x-cam,PL.y-14,Math.round(36*bar),4,'#ff4444');cx.fillStyle='#ff4444';cx.font='bold 9px Courier New';cx.textAlign='center';cx.fillText('점프금지',PL.x-cam+18,PL.y-18);}
+  if(hasInvincible){fillR(W/2-64,8,128,28,'rgba(0,0,0,.6)');cx.fillStyle='#ffd700';cx.font='bold 11px Courier New';cx.textAlign='center';cx.fillText('🛡 무적 '+Math.ceil(invincibleTimer/60)+'초',W/2,27);}
+  if(strayDogCompanion.active&&strayDogCompanion.name){fillR(8,44,90,18,'rgba(0,0,0,.5)');cx.fillStyle='#C8A060';cx.font='bold 9px Courier New';cx.textAlign='left';cx.fillText('🐕 '+strayDogCompanion.name,14,57);}
+  // 인벤 아이템 힌트
+  if(compassGot){fillR(W-100,44,92,18,'rgba(0,0,0,.5)');cx.fillStyle='#aaa';cx.font='9px Courier New';cx.textAlign='left';cx.fillText('🧭 나침반',W-98,57);}
+  if(boxGot){fillR(W-100,64,92,18,'rgba(0,0,0,.5)');cx.fillStyle='#aaa';cx.font='9px Courier New';cx.textAlign='left';cx.fillText('📦 봉인상자',W-98,77);}
+  const prog=Math.min(PL.x/WORLD,1);fillR(8,H-18,W-16,10,'rgba(0,0,0,.5)');fillR(8,H-18,(W-16)*prog,10,'#FFD700');
+  popups.forEach(p=>{cx.globalAlpha=Math.min(1,p.life/20);cx.fillStyle=p.c;cx.font='bold 12px Courier New';cx.textAlign='center';cx.fillText(p.t,p.x-cam+18,p.y-6);cx.globalAlpha=1;});
+  // 모바일 버튼
+  [[MB.right,'▶',mobileKeys.right,'#ffd700'],[MB.jump,'▲',mobileKeys.jump,'#69f0ae']].forEach(([btn,label,active,col])=>{
+    cx.globalAlpha=active?0.75:0.40;fillR(btn.x,btn.y,btn.w,btn.h,'#000');cx.strokeStyle=col;cx.lineWidth=2;cx.strokeRect(btn.x,btn.y,btn.w,btn.h);
+    cx.fillStyle=col;cx.font='bold 24px sans-serif';cx.textAlign='center';cx.fillText(label,btn.x+btn.w/2,btn.y+btn.h/2+9);cx.globalAlpha=1;
+  });
+}
+
+// ── 타이틀 ───────────────────────────────────────
+function drawTitle(){
+  drawBG();fillR(0,0,W,H,'rgba(0,0,0,.5)');
+  fillR(W/2-220,80,440,250,'#0e0e1e');cx.strokeStyle='#ffd700';cx.lineWidth=3;cx.strokeRect(W/2-220,80,440,250);
+  cx.fillStyle='#FFD700';cx.font='bold 26px Courier New';cx.textAlign='center';cx.fillText('🐾 조백호의 여행',W/2,122);
+  cx.fillStyle='#FFB7C5';cx.font='16px Courier New';cx.fillText('4장: 산 정상 (봄 밤)',W/2,150);
+  cx.fillStyle='#aaa';cx.font='11px Courier New';
+  cx.fillText('🐍 뱀 조심! 밟으면 하트-1+점프금지',W/2,165);
+  cx.fillText('🌬️ 강풍 버티기  ⭐ 별자리 잇기  🥶 추위 버티기',W/2,183);
+  cx.fillText('🐕 들개 협력  🪓 도끼 이벤트  🏔️ 하산',W/2,200);
+  if(ch3Save.strayDogName){cx.fillStyle='#C8A060';cx.font='11px Courier New';cx.fillText('🐕 '+ch3Save.strayDogName+' 와 함께!',W/2,222);}
+  if(Math.floor(frame/22)%2===0){cx.fillStyle='#FFD700';cx.font='bold 12px Courier New';cx.fillText('[ SPACE / 클릭 ]',W/2,252);}
+  spr(D_RUN1,W/2-18,265);
+}
+
+// ── 튜토리얼 ─────────────────────────────────────
+const TUT_PAGES=[
+  {title:'🏔️ 4장: 산 정상',content:`
+    <div class="tut-row"><span class="tut-icon">⛰️</span><span class="tut-text">드디어 정상에 올랐다!<br>바닷가 마을로 가려면 산을 넘어야 해!</span></div>
+    <div class="tut-row"><span class="tut-icon">🎮</span><span class="tut-text">이동: ← → / A,D &nbsp; 점프: ↑ / 스페이스</span></div>
+    <div class="tut-row"><span class="tut-icon">🎒</span><span class="tut-text">인벤토리: B 키 (고양이·새 능력은 인벤에서 꺼내 써야 활성화!)</span></div>
+    <div class="tut-row"><span class="tut-icon">⏸</span><span class="tut-text">일시정지: P 키 또는 화면 우상단</span></div>
+  `},
+  {title:'🐍 정상의 위험',content:`
+    <div class="tut-row"><span class="tut-icon">🐍</span><span class="tut-text">뱀을 밟으면 하트 -1 + 1초 점프 금지!</span></div>
+    <div class="tut-row"><span class="tut-icon">🌬️</span><span class="tut-text">강풍 이벤트: ← → 버튼으로 균형 유지!</span></div>
+    <div class="tut-row"><span class="tut-icon">🥶</span><span class="tut-text">추위 이벤트: 버튼·스페이스 연타로 36° 유지!</span></div>
+  `},
+  {title:'🐾 정상의 이벤트들',content:`
+    <div class="tut-row"><span class="tut-icon">⭐</span><span class="tut-text"><b style="color:#ffd700">별자리 잇기</b>: 순서 기억 후 별을 차례대로 클릭!</span></div>
+    <div class="tut-row"><span class="tut-icon">🐕</span><span class="tut-text"><b style="color:#C8A060">들개 협력</b>: 들개가 알려준 바위 틈 순서 기억하기!</span></div>
+    <div class="tut-row"><span class="tut-icon">🪓</span><span class="tut-text"><b style="color:#ffd700">도끼 이벤트</b>: 연타로 바위 쪼개기 (도끼 종류별 난이도 다름!)</span></div>
+    <div class="tut-row"><span class="tut-icon">🏔️</span><span class="tut-text">하산 브레이크 타이밍 → 5장 바닷가 마을!</span></div>
+  `},
+];
+let tutPage=0;
+function showTutorial(){gs='howto';tutPage=0;OV.style.display='flex';renderTut();}
+function renderTut(){
+  const p=TUT_PAGES[tutPage],isLast=tutPage===TUT_PAGES.length-1;
+  PNL.innerHTML='<h2>'+p.title+'</h2><div style="margin:8px 0">'+p.content+'</div>'
+    +'<p style="font-size:clamp(14px,1.8vw,20px);color:#555;margin-top:6px">'+(tutPage+1)+'/'+TUT_PAGES.length+'</p>'
+    +(tutPage>0?'<button class="btn b" onclick="prevTut()">◀ 이전</button>':'')
+    +(isLast?'<button class="btn g" onclick="startGame()">출발! 🐾</button>':'<button class="btn g" onclick="nextTut()">다음 ▶</button>');
+}
+function nextTut(){if(tutPage<TUT_PAGES.length-1){tutPage++;renderTut();}}
+window.nextTut=nextTut;
+window.prevTut=()=>{if(tutPage>0){tutPage--;renderTut();}};
+
+function togglePause(){
+  if(gs==='playing'){gs='paused';OV.style.display='flex';showPausePanel();ChoBGM.pause();}
+  else if(gs==='paused'){gs='playing';OV.style.display='none';ChoBGM.resume();}
+}
+function toggleInv(){
+  if(!hasBag)return;
+  if(gs==='playing'){gs='inv';OV.style.display='flex';renderInvGrid4();}
+  else if(gs==='inv'){gs='playing';OV.style.display='none';}
+}
+window.resumePlay=()=>{OV.style.display='none';gs='playing';PL.inv=Math.max(PL.inv,180);ChoBGM.resume();};
+window._puzzleCleanup=null; // 각 미니게임이 등록한 클린업 함수
+window.skipPuzzle=()=>{if(window._puzzleCleanup){window._puzzleCleanup();window._puzzleCleanup=null;}OV.style.display='none';gs='playing';};
+
+function showPausePanel(){
+  PNL.innerHTML='<h2>⏸ 일시정지</h2><p>점수: <b style="color:#ffd700">'+score+'</b></p>'
+    +'<button class="btn g" onclick="resumePlay()">계속 ▶</button>'
+    +'<button class="btn r" style="margin-top:8px" onclick="initGame();startGame()">처음부터</button>';
+}
+function showPanel(t){
+  OV.style.display='flex';ChoBGM.stop();
+  if(t==='over')PNL.innerHTML='<h2>💔 게임 오버</h2><p>점수: <b style="color:#ffd700">'+score+'</b></p>'
+    +'<button class="btn g" onclick="showLeaderboard()">점수 기록 🏆</button><br>'
+    +'<button class="btn" style="margin-top:6px" onclick="initGame();startGame()">다시 도전!</button>';
+}
+
+// ── 인벤토리 ─────────────────────────────────────
+const INV4={'catAbility':{icon:'😸',name:'고양이 능력',desc:'이중 점프!',color:'#ff8a65'},'birdAbility':{icon:'🐦',name:'새 능력',desc:'날기!',color:'#42a5f5'},'lifePotion':{icon:'🧪',name:'생명수',desc:'하트 가득!',color:'#69f0ae'},'shield':{icon:'🛡️',name:'무적 방패',desc:'3초 무적!',color:'#ffd700'}};
+let _sk4='';
+function renderInvGrid4(sk){
+  sk=sk||_sk4;
+  const slots=[];
+  if(inventory.catAbility)slots.push({key:'catAbility',...INV4.catAbility});
+  if(inventory.birdAbility)slots.push({key:'birdAbility',...INV4.birdAbility});
+  for(let i=0;i<inventory.lifePotion;i++)slots.push({key:'lp'+i,...INV4.lifePotion});
+  for(let i=0;i<inventory.shield;i++)slots.push({key:'sh'+i,...INV4.shield});
+  inventory.items.forEach((it,i)=>slots.push({key:'item_'+i,icon:it.icon||'📦',name:it.name,desc:it.desc||'',color:'#aaa'}));
+  let cells='';
+  for(let i=0;i<24;i++){
+    const s=slots[i];const sel=s&&s.key===sk;
+    const bc=sel?'#ffd700':(s?'#555':'#222');
+    const oc=s?(' onclick="_sk4=\''+s.key+'\';renderInvGrid4(\''+s.key+'\')"'):'';
+    cells+='<div'+oc+' style="aspect-ratio:1;background:'+(s?'#1a1a40':'#0a0a18')+';border:2px solid '+bc+';border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:calc(min(7vw,32px));cursor:'+(s?'pointer':'default')+'">'+(s?s.icon:'')+'</div>';
+  }
+  const sel=sk?slots.find(s=>s&&s.key===sk):null;
+  let detail='<div style="color:#444;font-size:clamp(16px,2.2vw,24px);margin-top:20px;text-align:center">← 아이템 선택</div>';
+  if(sel)detail='<div style="text-align:center;font-size:36px;margin-bottom:8px">'+sel.icon+'</div><b style="color:'+sel.color+';font-size:clamp(16px,2.2vw,24px);display:block;margin-bottom:6px">'+sel.name+'</b><p style="font-size:clamp(16px,2.2vw,24px);color:#bbb;margin-bottom:12px">'+sel.desc+'</p><button class="btn g" style="width:100%" onclick="useInv4(\''+sk+'\')">사용하기</button>';
+  PNL.innerHTML='<div style="display:flex;gap:12px;align-items:flex-start"><div style="flex-shrink:0"><div style="font-size:clamp(14px,1.8vw,20px);color:#888;margin-bottom:6px;text-align:center">🎒 인벤토리</div><div style="display:grid;grid-template-columns:repeat(4,1fr);gap:5px;width:min(44vw,260px)">'+cells+'</div></div><div style="flex:1;min-width:0;padding-top:20px">'+detail+'</div></div><button class="btn" style="margin-top:10px;display:block;width:100%" onclick="toggleInv()">닫기 (B)</button>';
+}
+window.useInv4=function(key){
+  if(key==='catAbility'){inventory.catAbility=false;PL.catAb=true;popups.push({x:PL.x,y:PL.y,t:'😸 이중점프!',c:'#ff8a65',life:70});toggleInv();}
+  else if(key==='birdAbility'){inventory.birdAbility=false;PL.birdAb=true;PL.birdBoosts=4;popups.push({x:PL.x,y:PL.y,t:'🐦 날기!',c:'#42a5f5',life:70});toggleInv();}
+  else if(key.startsWith('lp')){inventory.lifePotion--;hearts=maxHearts;popups.push({x:PL.x,y:PL.y,t:'💚 하트 가득!',c:'#69f0ae',life:70});renderInvGrid4();}
+  else if(key.startsWith('sh')){inventory.shield--;hasInvincible=true;invincibleTimer=180;popups.push({x:PL.x,y:PL.y,t:'🛡️ 무적!',c:'#ffd700',life:70});renderInvGrid4();}
+  else if(key.startsWith('item_')){const idx=parseInt(key.replace('item_',''));const item=inventory.items[idx];if(!item)return;popups.push({x:PL.x,y:PL.y,t:'사용할 수 없어요',c:'#ff8a65',life:60});renderInvGrid4();}
+};
+
+// ═══════════════════════════════════════════════════
+//  미니게임 1: 강풍 버티기
+// ═══════════════════════════════════════════════════
+let windGameLoop=null;
+function showWindIntro(){
+  gs='puzzle';OV.style.display='flex';
+  PNL.innerHTML='<div style="font-size:36px;margin-bottom:4px">🌬️</div>'
+    +'<h2 style="color:#88CCFF">정상의 강풍!</h2>'
+    +'<div style="background:#1a1a30;border:1px solid #88CCFF;padding:12px;margin-bottom:10px;text-align:left;line-height:1.9;font-size:clamp(16px,2.2vw,24px)">'
+    +'<span style="color:#aaa;font-style:italic">(정상에 올라서자 매서운 바람이 몰아쳤다)</span><br>'
+    +'<span style="color:#eee">"휘이이이익—!"</span><br>'
+    +'<span style="color:#ffd700">"버텨야 해! ← → 버튼으로 균형을 잡아!"</span></div>'
+    +'<button class="btn g" onclick="startWindGame()">버티기! 🌬️</button>';
+}
+window.startWindGame=()=>{
+  if(windGameLoop)clearInterval(windGameLoop);
+  let balance=0,wind=0,windTimer=0,timeLeft=10,tick=0,running=true;
+  const CW=500,CH=120;
+  PNL.innerHTML='<h2 class="mg-title">🌬️ 강풍 버티기!</h2>'
+    +'<p class="mg-desc">남은 시간: <b id="wt2">10</b>초</p>'
+    +'<div style="position:relative;width:min('+CW+'px,90vw);height:'+CH+'px;margin:8px auto;background:#1a1a30;border:2px solid #88CCFF;overflow:hidden">'
+    // 성공 범위 초록 영역 (중앙 ±30% = left:35%~65%)
+    +'<div style="position:absolute;left:35%;top:0;width:30%;height:100%;background:rgba(80,230,80,0.12);pointer-events:none"></div>'
+    +'<div style="position:absolute;left:35%;top:0;width:1px;height:100%;background:rgba(80,230,80,0.4)"></div>'
+    +'<div style="position:absolute;left:65%;top:0;width:1px;height:100%;background:rgba(80,230,80,0.4)"></div>'
+    +'<div style="position:absolute;left:50%;top:0;width:2px;height:100%;background:rgba(136,204,255,0.3)"></div>'
+    +'<div id="windbar" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:28px;height:28px;background:#ffd700;border-radius:50%;transition:left .05s"></div>'
+    +'</div>'
+    +'<div class="mg-sub" style="margin:4px 0">🟢 초록 구간 안에 있으면 안전!</div>'
+    +'<div id="windmsg" class="mg-sub" style="margin:2px 0;min-height:1.4em">바람: 잔잔</div>'
+    +'<div class="btn-row" style="margin-top:8px">'
+    +'<button class="btn b" id="wbL" style="font-size:clamp(22px,3.5vw,42px);padding:8px 24px">◀</button>'
+    +'<button class="btn b" id="wbR" style="font-size:clamp(22px,3.5vw,42px);padding:8px 24px">▶</button>'
+    +'</div>'
+    +'<button class="btn" style="margin-top:8px;font-size:clamp(14px,1.8vw,20px);padding:4px 12px" onclick="skipPuzzle()">포기하기</button>';
+  setTimeout(()=>{
+    const bar=document.getElementById('windbar');
+    const timeEl=document.getElementById('wt2');
+    const msgEl=document.getElementById('windmsg');
+    document.getElementById('wbL').addEventListener('click',()=>{if(running)balance-=18;});
+    document.getElementById('wbR').addEventListener('click',()=>{if(running)balance+=18;});
+    function onKey(e){if(!running)return;if(e.key==='ArrowLeft')balance-=18;if(e.key==='ArrowRight')balance+=18;}
+    document.addEventListener('keydown',onKey);
+    window._puzzleCleanup=()=>{clearInterval(windGameLoop);document.removeEventListener('keydown',onKey);running=false;};
+    windGameLoop=setInterval(()=>{
+      if(!running)return;
+      windTimer++;
+      if(windTimer%18===0)wind=(Math.random()-.5)*16;
+      balance+=wind;balance*=0.94;
+      balance=Math.max(-100,Math.min(100,balance));
+      const pct=(balance+100)/200;
+      if(bar){bar.style.left='calc('+pct*100+'% - 14px)';bar.style.background=Math.abs(balance)>70?'#ff5252':Math.abs(balance)>40?'#ff8c00':'#ffd700';}
+      if(msgEl)msgEl.textContent=wind>5?'💨 강풍 →':wind<-5?'💨 강풍 ←':'바람: 잔잔';
+      tick++;
+      if(tick%10===0){timeLeft--;if(timeEl)timeEl.textContent=timeLeft;}
+      if(Math.abs(balance)>=100){running=false;clearInterval(windGameLoop);document.removeEventListener('keydown',onKey);window._puzzleCleanup=null;windFail();}
+      if(timeLeft<=0){running=false;clearInterval(windGameLoop);document.removeEventListener('keydown',onKey);window._puzzleCleanup=null;windSuccess();}
+    },100);
+  },50);
+};
+function windFail(){
+  PNL.innerHTML='<h2>💨 휘청!</h2><p>바람에 넘어졌다...</p>'
+    +'<button class="btn g" onclick="startWindGame()">다시!</button>'
+    +'<button class="btn b" onclick="skipPuzzle()">그냥 가기</button>';
+}
+function windSuccess(){
+  windDone=true;score+=25;
+  inventory.items.push({name:'바람 결정체',icon:'🔹',desc:'정상의 강풍 속에서 굳어진 신비로운 결정. 바닷가 마을 사람들이 신기하게 여길지도...',fn:'',consumable:false,special:true});
+  PNL.innerHTML='<h2>✅ 강풍을 버텼다!</h2>'
+    +'<div style="background:#1a1a30;border:1px solid #88CCFF;padding:10px;margin-bottom:10px;text-align:left;line-height:1.9;font-size:clamp(16px,2.2vw,24px)">'
+    +'<span style="color:#aaa;font-style:italic">(바람이 잦아들자 발밑에 파란 결정이 빛나고 있었다)</span><br>'
+    +'<span style="color:#eee">"이게 뭐지...? 바람이 굳어진 건가?"</span></div>'
+    +'<div class="mg-hi">🔹 [바람 결정체] 획득! &nbsp; +25점!</div>'
+    +'<button class="btn g" style="margin-top:8px" onclick="resumePlay()">계속! 🐾</button>';
+}
+
+// ═══════════════════════════════════════════════════
+//  미니게임 2: 별자리 잇기
+// ═══════════════════════════════════════════════════
+// 별자리 데이터: 5개짜리 / 7개짜리 섞어서 랜덤
+// 좌표는 캔버스 520×300 기준 (0~1 비율)
+const CONSTELLATIONS=[
+  // ── 5개짜리 ──
+  {name:'카시오페이아',icon:'✨',count:5,
+   stars:[{x:.15,y:.35},{x:.30,y:.20},{x:.48,y:.38},{x:.66,y:.22},{x:.82,y:.38}],
+   lines:[[0,1],[1,2],[2,3],[3,4]]},
+  {name:'남십자자리',icon:'✝️',count:5,
+   stars:[{x:.50,y:.15},{x:.50,y:.55},{x:.30,y:.35},{x:.70,y:.35},{x:.50,y:.75}],
+   lines:[[0,1],[2,3],[1,4]]},
+  {name:'독수리자리',icon:'🦅',count:5,
+   stars:[{x:.25,y:.50},{x:.42,y:.35},{x:.55,y:.28},{x:.65,y:.38},{x:.78,y:.55}],
+   lines:[[0,1],[1,2],[2,3],[3,4]]},
+  {name:'왕관자리',icon:'👑',count:5,
+   stars:[{x:.22,y:.55},{x:.35,y:.30},{x:.50,y:.20},{x:.65,y:.30},{x:.78,y:.55}],
+   lines:[[0,1],[1,2],[2,3],[3,4]]},
+  // ── 7개짜리 ──
+  {name:'큰곰자리',icon:'🐻',count:7,
+   stars:[{x:.18,y:.60},{x:.30,y:.48},{x:.44,y:.45},{x:.56,y:.52},{x:.65,y:.38},{x:.74,y:.25},{x:.85,y:.18}],
+   lines:[[0,1],[1,2],[2,3],[3,4],[4,5],[5,6]]},
+  {name:'오리온자리',icon:'🏹',count:7,
+   stars:[{x:.28,y:.18},{x:.68,y:.20},{x:.20,y:.42},{x:.44,y:.48},{x:.56,y:.48},{x:.78,y:.42},{x:.44,y:.72},{x:.56,y:.72}],
+   lines:[[0,2],[1,5],[2,3],[3,4],[4,5],[3,6],[4,7]],
+   // 7개만 쓰도록 슬라이스
+   count:7,stars:[{x:.28,y:.18},{x:.68,y:.20},{x:.20,y:.42},{x:.44,y:.48},{x:.56,y:.48},{x:.78,y:.42},{x:.50,y:.75}],
+   lines:[[0,2],[1,5],[2,3],[3,4],[4,5],[3,6],[4,6]]},
+  {name:'백조자리',icon:'🦢',count:7,
+   stars:[{x:.15,y:.65},{x:.30,y:.50},{x:.50,y:.35},{x:.68,y:.22},{x:.50,y:.55},{x:.38,y:.70},{x:.62,y:.70}],
+   lines:[[0,1],[1,2],[2,3],[2,4],[4,5],[4,6]]},
+  {name:'전갈자리',icon:'🦂',count:7,
+   stars:[{x:.20,y:.25},{x:.32,y:.32},{x:.45,y:.30},{x:.55,y:.38},{x:.62,y:.52},{x:.58,y:.68},{x:.48,y:.78}],
+   lines:[[0,1],[1,2],[2,3],[3,4],[4,5],[5,6]]},
+];
+
+let starGameLoop=null,starFrame=0;
+function showCollectIntro(){
+  gs='puzzle';OV.style.display='flex';
+  PNL.innerHTML='<div style="font-size:36px;margin-bottom:4px">⭐</div>'
+    +'<h2 style="color:#ffd700">별자리 잇기!</h2>'
+    +'<div style="background:#1a1a30;border:1px solid #ffd700;padding:12px;margin-bottom:10px;text-align:left;line-height:1.9;font-size:clamp(16px,2.2vw,24px)">'
+    +'<span style="color:#aaa;font-style:italic">(구름 한 점 없는 맑은 밤, 정상의 하늘이 쏟아질 것 같다)</span><br>'
+    +'<span style="color:#eee">"별이 이렇게 가까이 보이는 곳이 있었다니..."</span><br>'
+    +'<span style="color:#ffd700">"별자리 순서를 기억해서 순서대로 이어봐!"</span></div>'
+    +'<button class="btn g" onclick="startStarGame()">별자리 잇기! ⭐</button>';
+}
+window.startStarGame=()=>{
+  if(starGameLoop)clearInterval(starGameLoop);
+  starFrame=0;
+
+  // 랜덤 별자리 선택
+  const pool5=CONSTELLATIONS.filter(c=>c.count===5);
+  const pool7=CONSTELLATIONS.filter(c=>c.count===7);
+  const usePool=Math.random()<0.5?pool5:pool7;
+  const con=usePool[Math.floor(Math.random()*usePool.length)];
+
+  const CW=520,CH=300;
+  // 별 실제 좌표
+  const stars=con.stars.map(s=>({x:s.x*CW,y:s.y*CH,lit:false,clicked:false,twinkle:Math.random()*Math.PI*2}));
+  const lines=con.lines;
+  let phase='hint'; // hint → input
+  let hintStep=0;   // 순서대로 반짝이는 인덱스
+  let playerSeq=[];  // 플레이어가 클릭한 순서 (star 인덱스)
+  let drawnLines=[];  // 이어진 선 [[from,to],...]
+  let wrongFlash=0;
+  let running=true;
+
+  PNL.innerHTML='<h2 class="mg-title">⭐ '+con.name+' '+con.icon+'</h2>'
+    +'<p class="mg-sub" id="starphasetxt">별자리 순서를 잘 봐둬!</p>'
+    +'<canvas id="starcv" width="'+CW+'" height="'+CH+'" style="display:block;margin:4px auto;border:2px solid #22223a;cursor:crosshair;width:min(520px,92vw);height:auto;background:#05050f"></canvas>'
+    +'<p class="mg-sub" id="starprog" style="margin-top:4px">힌트를 보여주는 중...</p>'
+    +'<button class="btn b" style="font-size:clamp(14px,1.8vw,20px);padding:4px 10px;margin-top:6px" onclick="skipPuzzle()">그냥 가기</button>';
+
+  setTimeout(()=>{
+    const cv=document.getElementById('starcv');if(!cv)return;
+    const cc=cv.getContext('2d');
+
+    // ── 배경 별 (장식용 작은 별들)
+    const bgStars=Array.from({length:60},()=>({
+      x:Math.random()*CW,y:Math.random()*CH,
+      r:0.5+Math.random()*1.2,wb:Math.random()*Math.PI*2,op:0.2+Math.random()*0.5
+    }));
+
+    function drawScene(){
+      // 배경
+      cc.fillStyle='#05050f';cc.fillRect(0,0,CW,CH);
+      // 배경 별
+      bgStars.forEach(s=>{
+        s.wb+=0.02;
+        cc.globalAlpha=s.op*(0.7+Math.sin(s.wb)*0.3);
+        cc.fillStyle='#fff';cc.beginPath();cc.arc(s.x,s.y,s.r,0,Math.PI*2);cc.fill();
+      });
+      cc.globalAlpha=1;
+
+      // 이어진 선
+      drawnLines.forEach(([a,b])=>{
+        cc.strokeStyle='rgba(180,220,255,0.6)';cc.lineWidth=2;
+        cc.beginPath();cc.moveTo(stars[a].x,stars[a].y);cc.lineTo(stars[b].x,stars[b].y);cc.stroke();
+      });
+
+      // 힌트 선 (hint 페이즈: 지금까지 보여준 선)
+      if(phase==='hint'&&hintStep>0){
+        for(let i=0;i<Math.min(hintStep-1,lines.length);i++){
+          const [a,b]=lines[i];
+          cc.strokeStyle='rgba(255,220,80,0.35)';cc.lineWidth=1.5;
+          cc.setLineDash([4,4]);
+          cc.beginPath();cc.moveTo(stars[a].x,stars[a].y);cc.lineTo(stars[b].x,stars[b].y);cc.stroke();
+          cc.setLineDash([]);
+        }
+      }
+
+      // 오답 플래시
+      if(wrongFlash>0){
+        cc.fillStyle='rgba(255,50,50,'+(wrongFlash/20*0.25)+')';
+        cc.fillRect(0,0,CW,CH);
+        wrongFlash--;
+      }
+
+      // 별 그리기
+      stars.forEach((s,i)=>{
+        s.twinkle+=0.06;
+        const isHintActive=phase==='hint'&&i===hintStep;
+        const isClicked=s.clicked;
+        const isNext=phase==='input'&&playerSeq.length<lines.length&&lines[playerSeq.length]&&(i===lines[playerSeq.length][playerSeq.length===0?0:1]||i===lines[playerSeq.length][0]);
+
+        // 별 빛 후광
+        let glowR=0,glowCol='rgba(255,220,80,0)';
+        if(isHintActive){glowR=22;glowCol='rgba(255,220,80,0.5)';}
+        else if(isClicked){glowR=14;glowCol='rgba(100,200,255,0.4)';}
+        else if(phase==='input'){glowR=10;glowCol='rgba(255,255,255,0.12)';}
+        if(glowR>0){
+          const g=cc.createRadialGradient(s.x,s.y,0,s.x,s.y,glowR);
+          g.addColorStop(0,glowCol);g.addColorStop(1,'rgba(0,0,0,0)');
+          cc.fillStyle=g;cc.beginPath();cc.arc(s.x,s.y,glowR,0,Math.PI*2);cc.fill();
+        }
+
+        // 별 본체
+        const r=isHintActive?(5+Math.sin(s.twinkle*3)*2):isClicked?5:4;
+        cc.fillStyle=isHintActive?'#ffe566':isClicked?'#88ccff':'rgba(255,255,255,0.85)';
+        cc.beginPath();cc.arc(s.x,s.y,r,0,Math.PI*2);cc.fill();
+
+        // 순서 번호 — 힌트 페이즈에서 현재 반짝이는 별에만 표시
+        if(phase==='hint'&&isHintActive){
+          cc.fillStyle='#ffe566';cc.font='bold 11px Courier New';cc.textAlign='center';
+          // order 배열에서 이 별의 순서 찾기
+          const order2=[];
+          if(lines.length>0)order2.push(lines[0][0]);
+          lines.forEach(([a,b])=>{if(!order2.includes(b))order2.push(b);});
+          const hintNum=order2.indexOf(i);
+          if(hintNum>=0)cc.fillText(hintNum+1,s.x,s.y-10);
+        }
+      });
+    }
+
+    starGameLoop=setInterval(()=>{
+      if(!running)return;
+      starFrame++;
+      drawScene();
+    },16);
+    window._puzzleCleanup=()=>{clearInterval(starGameLoop);running=false;};
+
+    // ── 힌트 페이즈: 순서대로 반짝이며 보여주기
+    function runHint(){
+      const phaseEl=document.getElementById('starphasetxt');
+      const progEl=document.getElementById('starprog');
+      if(phaseEl)phaseEl.textContent='별자리 순서를 잘 봐둬!';
+      // 연결 순서 = lines 배열의 from→to
+      // hintStep: 0~stars.length 순서로 별을 하나씩 켜기
+      // lines[0]=[a,b], lines[1]=[b,c]... 식이므로 첫 별부터 순서 추출
+      const order=[];
+      if(lines.length>0){order.push(lines[0][0]);}
+      lines.forEach(([a,b])=>{if(!order.includes(b))order.push(b);});
+
+      let idx=0;
+      const hintIv=setInterval(()=>{
+        if(idx>0) hintStep=order[idx-1]; // 이전 별 끄기용
+        hintStep=order[idx]!==undefined?order[idx]:-1;
+        if(progEl)progEl.textContent='힌트 '+(idx+1)+' / '+order.length;
+        idx++;
+        if(idx>order.length){
+          clearInterval(hintIv);
+          hintStep=-1;
+          // 잠깐 전체 보여주다가 숨기기
+          setTimeout(()=>{
+            phase='input';
+            if(phaseEl)phaseEl.textContent='이제 순서대로 별을 클릭해서 이어봐!';
+            if(progEl)progEl.textContent='0 / '+lines.length+' 연결';
+            drawnLines=[];
+          },800);
+        }
+      },600);
+    }
+    setTimeout(runHint,400);
+
+    // ── 클릭/터치 입력
+    function onStarClick(mx,my){
+      if(phase!=='input'||!running)return;
+      // 가장 가까운 별 찾기
+      let hit=-1,minD=28;
+      stars.forEach((s,i)=>{
+        if(s.clicked)return;
+        const d=Math.sqrt((mx-s.x)**2+(my-s.y)**2);
+        if(d<minD){minD=d;hit=i;}
+      });
+      if(hit<0)return;
+
+      // 순서 검증: playerSeq.length번째 연결의 다음 별이어야 함
+      const step=playerSeq.length;
+      // 첫 클릭: lines[0][0] 이어야 함
+      // 이후: 이전 lines[step-1][1] 다음이 lines[step][?] 이어야 함
+      // 실제 연결 순서 = order 배열
+      const order=[];
+      if(lines.length>0)order.push(lines[0][0]);
+      lines.forEach(([a,b])=>{if(!order.includes(b))order.push(b);});
+
+      if(hit!==order[step]){
+        wrongFlash=20;
+        const prog=document.getElementById('starprog');
+        if(prog){const old=prog.textContent;prog.style.color='#ff5252';prog.textContent='❌ 틀렸어! 처음부터!';
+          setTimeout(()=>{prog.style.color='';prog.textContent=old;},800);}
+        // 리셋
+        playerSeq=[];drawnLines=[];stars.forEach(s=>s.clicked=false);
+        return;
+      }
+
+      // 정답
+      stars[hit].clicked=true;
+      playerSeq.push(hit);
+      if(playerSeq.length>1){
+        drawnLines.push([order[step-1],order[step]]);
+      }
+      const prog=document.getElementById('starprog');
+      if(prog)prog.textContent=playerSeq.length+' / '+order.length+' 연결';
+
+      if(playerSeq.length>=order.length){
+        running=false;clearInterval(starGameLoop);
+        setTimeout(starSuccess,500);
+      }
+    }
+
+    cv.addEventListener('click',e=>{const r=cv.getBoundingClientRect();onStarClick((e.clientX-r.left)*(CW/r.width),(e.clientY-r.top)*(CH/r.height));});
+    cv.addEventListener('touchstart',e=>{e.preventDefault();const r=cv.getBoundingClientRect();const t0=e.changedTouches[0];onStarClick((t0.clientX-r.left)*(CW/r.width),(t0.clientY-r.top)*(CH/r.height));},{passive:false});
+  },50);
+};
+function starSuccess(){
+  collectDone=true;score+=25;
+  inventory.items.push({name:'별자리 지도',icon:'📜',desc:'정상에서 밤하늘을 보며 직접 그린 별자리 지도. 뱃사람이라면 눈이 번쩍 뜨일지도...',fn:'',consumable:false,special:true});
+  PNL.innerHTML='<h2>⭐ 별자리 완성!</h2>'
+    +'<div style="background:#1a1a30;border:1px solid #ffd700;padding:10px;margin-bottom:10px;text-align:left;line-height:1.9;font-size:clamp(16px,2.2vw,24px)">'
+    +'<span style="color:#aaa;font-style:italic">(별자리를 이으며 하늘의 길을 눈에 새겼다)</span><br>'
+    +'<span style="color:#eee">"이 별자리 지도... 바다에서도 쓸 수 있을 것 같아!"</span></div>'
+    +'<div class="mg-hi">📜 [별자리 지도] 획득! &nbsp; +25점!</div>'
+    +'<div class="mg-sub" style="margin-top:4px">🧭 나침반이랑 같이 쓰면 더 유용할지도?</div>'
+    +'<button class="btn g" style="margin-top:8px" onclick="resumePlay()">계속! 🐾</button>';
+}
+
+// ═══════════════════════════════════════════════════
+//  미니게임 3: 추위 버티기
+// ═══════════════════════════════════════════════════
+let coldGameLoop=null;
+function showColdIntro(){
+  gs='puzzle';OV.style.display='flex';
+  PNL.innerHTML='<div style="font-size:36px;margin-bottom:4px">🥶</div>'
+    +'<h2 style="color:#82b1ff">추위가 몰아친다!</h2>'
+    +'<div style="background:#1a1a30;border:1px solid #82b1ff;padding:12px;margin-bottom:10px;text-align:left;line-height:1.9;font-size:clamp(16px,2.2vw,24px)">'
+    +'<span style="color:#aaa;font-style:italic">(정상의 기온이 급격히 내려갔다)</span><br>'
+    +'<span style="color:#eee">"으으으... 너무 추워!"</span><br>'
+    +'<span style="color:#ffd700">"버튼 또는 스페이스바로 몸을 움직여! 체온이 36° 아래로 내려가면 끝!"</span></div>'
+    +'<button class="btn g" onclick="startColdGame()">버티기! 🔥</button>';
+}
+window.startColdGame=()=>{
+  if(coldGameLoop)clearInterval(coldGameLoop);
+  // 체온: 37~42 사이 유지가 목표. 시작은 39도, 37 이하 실패
+  const TEMP_MAX=42,TEMP_SAFE=36,TEMP_START=39;
+  let temp=TEMP_START,timeLeft=15,tick=0,running=true;
+  // 스페이스바 핸들러
+  function onSpace(e){if(running&&e.code==='Space'){e.preventDefault();temp=Math.min(TEMP_MAX,temp+0.9);}}
+  document.addEventListener('keydown',onSpace);
+  PNL.innerHTML='<h2 class="mg-title">🥶 체온 유지!</h2>'
+    +'<p class="mg-desc">남은 시간: <b id="cot">15</b>초</p>'
+    +'<div style="position:relative;width:min(400px,80vw);height:clamp(20px,3vw,32px);background:#1a1a30;border:2px solid #555;border-radius:20px;margin:8px auto;overflow:hidden">'
+    // 안전선: 36/42 ≒ 86% → 가운데쯤(50%)으로 표시
+    +'<div style="position:absolute;left:50%;top:0;width:2px;height:100%;background:rgba(255,80,80,0.7)"></div>'
+    +'<div id="tempbar" style="height:100%;width:'+(TEMP_START/TEMP_MAX*100)+'%;background:#ff6b35;border-radius:20px;transition:width .08s"></div></div>'
+    +'<div class="mg-hi" id="tempval" style="margin-bottom:4px">'+TEMP_START+'°</div>'
+    +'<div class="mg-sub" style="margin-bottom:10px">🔴 빨간 선 아래로 내려가면 실패! (36°)</div>'
+    +'<button class="btn g" id="coldbtn" style="font-size:clamp(22px,3.5vw,42px);padding:clamp(12px,2vw,22px) clamp(24px,4vw,46px)">🔥 몸 움직이기! (스페이스)</button>'
+    +'<button class="btn" style="font-size:clamp(14px,1.8vw,20px);padding:4px 12px;display:block;margin:8px auto 0" onclick="coldCleanup();skipPuzzle()">포기하기</button>';
+  function coldCleanup(){document.removeEventListener('keydown',onSpace);if(coldGameLoop)clearInterval(coldGameLoop);}
+  window.coldCleanup=coldCleanup;
+  window._puzzleCleanup=()=>{coldCleanup();running=false;};
+  setTimeout(()=>{
+    document.getElementById('coldbtn').addEventListener('click',()=>{if(running)temp=Math.min(TEMP_MAX,temp+0.9);});
+    coldGameLoop=setInterval(()=>{
+      if(!running)return;
+      const elapsed=15-timeLeft;
+      // 기존보다 10% 쉽게: dropRate 0.25~0.57 (기존 0.28~0.63)
+      const dropRate=0.25+elapsed*0.022;
+      temp-=dropRate;
+      temp=Math.max(34,temp);
+      const bar=document.getElementById('tempbar');
+      const val=document.getElementById('tempval');
+      // 게이지: 36°가 바의 50% 위치에 오도록 스케일 조정
+      // 34°=0%, 42°=100% → pct=(temp-34)/(42-34)*100
+      const pct=Math.max(0,((temp-34)/(TEMP_MAX-34))*100);
+      if(bar){
+        bar.style.width=pct+'%';
+        bar.style.background=temp>=39?'#ff6b35':temp>=36?'#ff8c00':'#4488ff';
+      }
+      if(val)val.textContent=temp.toFixed(1)+'°';
+      tick++;
+      if(tick%10===0){timeLeft--;const ct=document.getElementById('cot');if(ct)ct.textContent=timeLeft;}
+      if(temp<TEMP_SAFE){running=false;clearInterval(coldGameLoop);coldCleanup();window._puzzleCleanup=null;coldFail();}
+      if(timeLeft<=0){running=false;clearInterval(coldGameLoop);coldCleanup();window._puzzleCleanup=null;coldSuccess();}
+    },100);
+  },50);
+};
+function coldFail(){
+  PNL.innerHTML='<h2>🥶 저체온증!</h2><p>체온이 36°C 아래로 내려갔다...</p>'
+    +'<button class="btn g" onclick="startColdGame()">다시!</button>'
+    +'<button class="btn b" onclick="skipPuzzle()">그냥 가기</button>';
+}
+function coldSuccess(){
+  coldDone=true;score+=25;
+  inventory.items.push({name:'산삼',icon:'🌿',desc:'극한의 추위 속에서 발견한 희귀 약초. 마을 어르신이라면 귀하게 여길 것 같다...',fn:'',consumable:false,special:true});
+  PNL.innerHTML='<h2>✅ 체온을 지켰다!</h2>'
+    +'<div style="background:#1a1a30;border:1px solid #82b1ff;padding:10px;margin-bottom:10px;text-align:left;line-height:1.9;font-size:clamp(16px,2.2vw,24px)">'
+    +'<span style="color:#aaa;font-style:italic">(몸을 움직이다 눈 속에서 붉은 열매가 달린 풀을 발견했다)</span><br>'
+    +'<span style="color:#eee">"이런 데서 자라는 약초라니... 귀한 게 분명해!"</span></div>'
+    +'<div class="mg-hi">🌿 [산삼] 획득! &nbsp; +25점!</div>'
+    +'<button class="btn g" style="margin-top:8px" onclick="resumePlay()">계속! 🐾</button>';
+}
+
+// ═══════════════════════════════════════════════════
+//  들개 이벤트: 순서 기억 → 나침반 획득
+// ═══════════════════════════════════════════════════
+function showDogEventIntro(){
+  gs='puzzle';OV.style.display='flex';
+  if(!strayDogHas){
+    // 들개 없는 경우 → 통과 불가
+    PNL.innerHTML='<div style="font-size:40px;margin-bottom:4px">🐕</div>'
+      +'<h2 style="color:#C8A060">바위 틈의 냄새</h2>'
+      +'<div style="background:#1a1a30;border:1px solid #C8A060;padding:12px;margin-bottom:10px;text-align:left;line-height:1.9;font-size:clamp(16px,2.2vw,24px)">'
+      +'<span style="color:#aaa;font-style:italic">(바위 틈에서 뭔가 숨겨진 것 같은 냄새가 난다)</span><br>'
+      +'<span style="color:#eee">"냄새가 나는데... 뭔가 있는 것 같아."</span><br>'
+      +'<span style="color:#ff5252">"같이 온 들개가 있어야 찾을 수 있을 것 같다..."</span></div>'
+      +'<button class="btn b" onclick="resumePlay()">그냥 지나치기</button>';
+    return;
+  }
+  PNL.innerHTML='<div style="font-size:40px;margin-bottom:4px">🐕</div>'
+    +'<h2 style="color:#C8A060">'+strayDogName+'가 뭔가 발견!</h2>'
+    +'<div style="background:#1a1a30;border:1px solid #C8A060;padding:12px;margin-bottom:10px;text-align:left;line-height:1.9;font-size:clamp(16px,2.2vw,24px)">'
+    +'<span style="color:#aaa;font-style:italic">('+strayDogName+'이(가) 바위 틈들을 차례로 킁킁거린다)</span><br>'
+    +'<span style="color:#eee">"컹컹! 컹!"</span><br>'
+    +'<span style="color:#ffd700">"들개가 알려준 순서대로 바위를 클릭해봐!"</span></div>'
+    +'<button class="btn g" onclick="startDogEvent()">순서 맞추기! 🐕</button>';
+}
+window.startDogEvent=()=>{
+  const HOLES=5,SEQ_LEN=4;
+  let seq=[],playerSeq=[],phase='show',showIdx=0;
+  for(let i=0;i<SEQ_LEN;i++)seq.push(Math.floor(Math.random()*HOLES));
+  const holesHtml=Array.from({length:HOLES},(_,i)=>`<button id="dh${i}" onclick="dogHoleClick(${i})" style="width:clamp(44px,7vw,76px);height:clamp(44px,7vw,76px);background:#2a2a40;border:3px solid #555;border-radius:50%;font-size:clamp(20px,3vw,34px);cursor:pointer;transition:all .2s;margin:3px">🪨</button>`).join('');
+  PNL.innerHTML='<h2 class="mg-title">🐕 '+strayDogName+'의 코!</h2>'
+    +'<p class="mg-sub" id="dogphasetxt">들개가 순서를 알려주는 중...</p>'
+    +'<div class="btn-row" style="margin:14px 0">'+holesHtml+'</div>'
+    +'<p class="mg-sub" id="dogprog">순서: 0 / '+SEQ_LEN+'</p>';
+  window.dogHoleClick=function(idx){
+    if(phase!=='input')return;
+    const btn=document.getElementById('dh'+idx);
+    if(btn){btn.style.background='#ffd700';setTimeout(()=>{btn.style.background='#2a2a40';},250);}
+    playerSeq.push(idx);
+    const pos=playerSeq.length-1;
+    const prog=document.getElementById('dogprog');
+    if(prog)prog.textContent='순서: '+playerSeq.length+' / '+SEQ_LEN;
+    if(seq[pos]!==idx){phase='done';dogEventFail();return;}
+    if(playerSeq.length>=SEQ_LEN){phase='done';setTimeout(dogEventSuccess,400);}
+  };
+  // 순서 보여주기
+  setTimeout(()=>{
+    let i=0;
+    const iv=setInterval(()=>{
+      if(i>0){const prev=document.getElementById('dh'+seq[i-1]);if(prev){prev.style.background='#2a2a40';prev.style.borderColor='#555';}}
+      if(i>=SEQ_LEN){clearInterval(iv);phase='input';const ph=document.getElementById('dogphasetxt');if(ph)ph.textContent='이제 같은 순서로 클릭!';}
+      else{const btn=document.getElementById('dh'+seq[i]);if(btn){btn.style.background='#8B7355';btn.style.borderColor='#C8A060';}i++;}
+    },700);
+  },400);
+};
+function dogEventFail(){
+  PNL.innerHTML='<h2>❌ 순서가 달라!</h2><p>'+strayDogName+'이(가) 다시 킁킁거리기 시작한다...</p>'
+    +'<button class="btn g" onclick="startDogEvent()">다시!</button>';
+}
+function dogEventSuccess(){
+  dogEventDone=true;compassGot=true;score+=25;
+  inventory.items.push({name:'낡은 나침반',icon:'🧭',desc:'바닷가 마을에서 쓸 수 있을지도... 누가 숨겨뒀을까?',fn:'',consumable:false,special:true});
+  PNL.innerHTML='<h2 style="color:#C8A060">🧭 낡은 나침반 발견!</h2>'
+    +'<div style="background:#1a1a30;border:1px solid #C8A060;padding:12px;margin-bottom:10px;text-align:left;line-height:1.9;font-size:clamp(16px,2.2vw,24px)">'
+    +'<span style="color:#aaa;font-style:italic">(바위 틈 깊숙이 낡은 나침반이 숨겨져 있었다)</span><br>'
+    +'<span style="color:#eee">"누가 여기 두고 갔을까..."</span><br>'
+    +'<span style="color:#ffd700">"컹! 컹컹!" ('+strayDogName+'가 꼬리를 신나게 흔든다)</span></div>'
+    +'<div class="mg-hi">🧭 [낡은 나침반] 획득! &nbsp; +25점!</div>'
+    +'<button class="btn g" style="margin-top:10px" onclick="resumePlay()">계속! 🐾</button>';
+}
+
+// ═══════════════════════════════════════════════════
+//  도끼 이벤트: 바위 연타 → 봉인상자 획득 (의무)
+// ═══════════════════════════════════════════════════
+let axeEventLoop=null;
+
+// 도끼 종류별 설정: target(연타수), timeLeft(초), 색상
+const AXE_CONFIG={
+  gold: {label:'금도끼 🪙', target:20, time:8,  barColor:'#FFD700', desc:'금도끼라 바위가 잘 쪼개질 것 같다!'},
+  silver:{label:'은도끼 🥈', target:28, time:8,  barColor:'#C8C8D8', desc:'은도끼로 힘껏 내리쳐보자!'},
+  iron:  {label:'돌도끼 ⚙️', target:36, time:9,  barColor:'#909090', desc:'돌도끼라 조금 힘들겠지만...'},
+  none:  {label:'맨손 ✊',   target:45, time:10, barColor:'#CC6633', desc:'도끼가 없다! 맨손으로 쪼개야 한다...'},
+};
+
+function showAxeEventIntro(){
+  gs='puzzle';OV.style.display='flex';
+
+  // 도끼 중 제일 좋은 것 선택 (gold > silver > iron > none)
+  const priority=['gold','silver','iron'];
+  let bestAxe=null;
+  for(const p of priority){
+    const found=axeItems.find(it=>it.axeType===p);
+    if(found){bestAxe=found;break;}
+  }
+  const cfg=bestAxe?AXE_CONFIG[bestAxe.axeType]:AXE_CONFIG.none;
+  const axeIcon=bestAxe?bestAxe.icon:'✊';
+
+  PNL.innerHTML='<div style="font-size:36px;margin-bottom:4px">'+axeIcon+'</div>'
+    +'<h2 style="color:#ffd700">빛나는 특수 바위!</h2>'
+    +'<div style="background:#1a1a30;border:1px solid #ffd700;padding:12px;margin-bottom:10px;text-align:left;line-height:1.9;font-size:clamp(16px,2.2vw,24px)">'
+    +'<span style="color:#aaa;font-style:italic">(반짝이는 바위 앞에 섰다. 뭔가 숨겨진 것 같다)</span><br>'
+    +'<span style="color:#eee">"'+cfg.desc+'"</span><br>'
+    +'<span style="color:#ffd700">'+cfg.time+'초 안에 '+cfg.target+'번 내리쳐라! (버튼 or 스페이스바)</span><br>'
+    +(bestAxe?'<span style="color:#aaa;font-size:0.85em">⚠️ 이벤트 후 '+cfg.label+' 소모</span>':'')
+    +'</div>'
+    +'<button class="btn g" onclick="startAxeEvent()">'+axeIcon+' 쪼개기 시작!</button>';
+  // 선택된 도끼 저장 (startAxeEvent에서 참조)
+  window._selectedAxe=bestAxe;
+}
+
+window.startAxeEvent=()=>{
+  if(axeEventLoop)clearInterval(axeEventLoop);
+  const bestAxe=window._selectedAxe;
+  const cfg=bestAxe?AXE_CONFIG[bestAxe.axeType]:AXE_CONFIG.none;
+  let clicks=0,target=cfg.target,timeLeft=cfg.time,tick=0,running=true;
+
+  PNL.innerHTML='<h2 class="mg-title">'+(bestAxe?bestAxe.icon:'✊')+' 바위 쪼개기!</h2>'
+    +'<p class="mg-sub">남은 시간: <b id="axetime">'+cfg.time+'</b>초 &nbsp;|&nbsp; 목표: '+target+'번</p>'
+    +'<div style="width:min(400px,80vw);height:clamp(20px,3vw,32px);background:#1a1a30;border:2px solid #555;border-radius:20px;margin:8px auto;overflow:hidden">'
+    +'<div id="axebar" style="height:100%;width:0%;background:'+cfg.barColor+';border-radius:20px;transition:width .05s"></div></div>'
+    +'<div class="mg-hi" id="axecnt" style="margin-bottom:6px">0 / '+target+'</div>'
+    +'<div id="rockemoji" style="font-size:clamp(50px,8vw,86px);margin:6px 0;transition:transform .08s">🪨</div>'
+    +'<button class="btn g" id="axebtn" style="font-size:clamp(22px,3.5vw,42px);padding:clamp(12px,2vw,22px) clamp(24px,4vw,46px)">'+(bestAxe?'🪓':'✊')+' 내리치기! (스페이스)</button>';
+
+  setTimeout(()=>{
+    let shakeDir=1;
+    function doHit(){
+      if(!running)return;
+      clicks++;
+      const bar=document.getElementById('axebar');
+      const cnt=document.getElementById('axecnt');
+      const rock=document.getElementById('rockemoji');
+      if(bar)bar.style.width=(clicks/target*100)+'%';
+      if(cnt)cnt.textContent=clicks+' / '+target;
+      if(rock){
+        rock.style.transform='rotate('+(shakeDir*10)+'deg)';
+        shakeDir*=-1;
+        setTimeout(()=>{if(rock)rock.style.transform='rotate(0deg)';},80);
+      }
+      // 균열 이모지 변화
+      if(rock){
+        const pct=clicks/target;
+        if(pct>=0.8)rock.textContent='💥';
+        else if(pct>=0.5)rock.textContent='🪨💢';
+        else if(pct>=0.25)rock.textContent='🪨';
+      }
+      if(clicks>=target)endAxeEvent(true);
+    }
+
+    // 버튼 클릭
+    const btn=document.getElementById('axebtn');
+    if(btn)btn.addEventListener('click',doHit);
+
+    // 스페이스바 연타
+    function onAxeKey(e){if(e.code==='Space'){e.preventDefault();doHit();}}
+    document.addEventListener('keydown',onAxeKey);
+    window._puzzleCleanup=()=>{clearInterval(axeEventLoop);document.removeEventListener('keydown',onAxeKey);running=false;};
+
+    axeEventLoop=setInterval(()=>{
+      if(!running)return;
+      tick++;
+      if(tick%10===0){
+        timeLeft--;
+        const t=document.getElementById('axetime');
+        if(t)t.textContent=timeLeft;
+        if(timeLeft<=0)endAxeEvent(false);
+      }
+    },100);
+
+    function endAxeEvent(success){
+      if(!running)return;running=false;
+      clearInterval(axeEventLoop);
+      document.removeEventListener('keydown',onAxeKey);
+      window._puzzleCleanup=null;
+      if(success)axeEventSuccess(bestAxe);
+      else axeEventFail();
+    }
+  },50);
+};
+
+function axeEventFail(){
+  // 의무 이벤트 → 다시 도전만 가능
+  PNL.innerHTML='<h2>⏰ 시간 부족!</h2><p>바위가 꿈쩍도 않는다...<br>다시 해봐!</p>'
+    +'<button class="btn g" onclick="startAxeEvent()">다시!</button>';
+}
+
+function axeEventSuccess(usedAxe){
+  axeEventDone=true;boxGot=true;score+=30;
+  inventory.items.push({name:'봉인된 작은 상자',icon:'📦',desc:'열쇠가 있어야 열 수 있다. 바다 어딘가에 열쇠가 있을지도...',fn:'',consumable:false,special:true});
+  // 사용한 도끼 소비 (제일 좋은 도끼 하나만)
+  if(usedAxe){
+    const idx=inventory.items.findIndex(it=>it.axeType===usedAxe.axeType);
+    if(idx>=0)inventory.items.splice(idx,1);
+    // axeItems 배열에서도 제거
+    const ai=axeItems.findIndex(it=>it.axeType===usedAxe.axeType);
+    if(ai>=0)axeItems.splice(ai,1);
+  }
+  const axeIcon=usedAxe?usedAxe.icon:'✊';
+  ChoSFX.win();PNL.innerHTML='<h2 style="color:#ffd700">💥 바위가 쪼개졌다!</h2>'
+    +'<div style="background:#1a1a30;border:1px solid #ffd700;padding:12px;margin-bottom:10px;text-align:left;line-height:1.9;font-size:clamp(16px,2.2vw,24px)">'
+    +'<span style="color:#aaa;font-style:italic">(바위 안에서 낡은 작은 상자가 나왔다. 봉인되어 있다)</span><br>'
+    +'<span style="color:#eee">"열쇠가 있어야 열 수 있겠어..."</span><br>'
+    +'<span style="color:#ffd700">"바다 어딘가에... 있지 않을까?"</span></div>'
+    +'<div class="mg-hi">📦 [봉인된 작은 상자] 획득! &nbsp; +30점!</div>'
+    +(usedAxe?'<div class="mg-sub" style="margin-top:4px">'+axeIcon+' '+usedAxe.name+' 소모됨</div>':'')
+    +'<button class="btn g" style="margin-top:10px" onclick="resumePlay()">계속! 🐾</button>';
+}
+
+// ═══════════════════════════════════════════════════
+//  마지막 미션: 하산 브레이크 타이밍
+// ═══════════════════════════════════════════════════
+const DESCENT_SEGS=[
+  {name:'완만한 내리막',sub:'속도: 보통',speed:2.2,label:'구간 1'},
+  {name:'가파른 절벽길',sub:'속도: 빠름!',speed:3.8,label:'구간 2'},
+  {name:'얼어붙은 구간',sub:'⚠️ 속도: 매우 빠름!!',speed:5.0,label:'구간 3'},
+  {name:'마지막 내리막',sub:'속도: 보통',speed:2.6,label:'구간 4'},
+];
+let descentLives=3,descentSeg=0,descentLoop=null;
+function showDescentIntro(){
+  gs='puzzle';OV.style.display='flex';
+  PNL.innerHTML='<div style="font-size:36px;margin-bottom:4px">🏔️</div>'
+    +'<h2 style="color:#ffd700">하산 시작!</h2>'
+    +'<div style="background:#1a1a30;border:1px solid #ffd700;padding:12px;margin-bottom:10px;text-align:left;line-height:1.9;font-size:clamp(16px,2.2vw,24px)">'
+    +'<span style="color:#aaa;font-style:italic">(저 아래, 바닷가 마을의 불빛이 어렴풋이 보인다)</span><br>'
+    +'<span style="color:#eee">"이제 내려가야 해!"</span><br>'
+    +'<span style="color:#ffd700">"속도계가 초록 구간일 때 브레이크를 걸어라!"</span><br>'
+    +'<span style="color:#aaa">너무 느리면 실패 / 너무 빠르면 미끄러짐</span></div>'
+    +'<button class="btn g" onclick="startDescent()">내려가기! 🏃</button>';
+}
+window.startDescent=()=>{
+  descentLives=3;descentSeg=0;
+  showDescentSeg();
+};
+function showDescentSeg(){
+  if(descentSeg>=DESCENT_SEGS.length){descentSuccess();return;}
+  if(descentLoop)clearInterval(descentLoop);
+  const seg=DESCENT_SEGS[descentSeg];
+  let barVal=0,dir=1,braked=false;
+  const livesHtml='❤️'.repeat(descentLives)+'🖤'.repeat(3-descentLives);
+  PNL.innerHTML='<h2 class="mg-title">🏔️ 하산 중!</h2>'
+    +'<p class="mg-desc">'+seg.name+'</p>'
+    +'<p class="mg-sub">'+seg.sub+' &nbsp;|&nbsp; '+livesHtml+'</p>'
+    +'<div style="margin:12px 0">'
+    +'<div style="color:#aaa;font-size:clamp(12px,1.6vw,18px);margin-bottom:4px">속도계</div>'
+    +'<div style="position:relative;width:min(420px,85vw);height:clamp(22px,3vw,36px);background:#1a1a30;border:2px solid #555;border-radius:20px;margin:0 auto;overflow:hidden">'
+    +'<div style="position:absolute;left:30%;top:0;width:40%;height:100%;background:rgba(80,230,80,0.15)"></div>'
+    +'<div id="dbar" style="position:absolute;top:3px;bottom:3px;width:clamp(16px,2.5vw,26px);background:#ff4444;border-radius:12px;left:0%;transition:left .04s"></div>'
+    +'</div>'
+    +'<div class="mg-sub" style="margin-top:4px">🟢 초록 구간에서 브레이크! (스페이스도 가능)</div>'
+    +'</div>'
+    +'<button class="btn g" id="brakebtn" style="font-size:clamp(22px,3.5vw,42px);padding:clamp(12px,2vw,22px) clamp(24px,4vw,46px)">🛑 브레이크!</button>'
+    +'<div id="dsegmsg" class="mg-sub" style="margin-top:8px;min-height:1.4em">'+(descentSeg+1)+'/'+DESCENT_SEGS.length+' 구간</div>';
+  setTimeout(()=>{
+    descentLoop=setInterval(()=>{
+      barVal+=dir*seg.speed;
+      if(barVal>=100){barVal=100;dir=-1;}
+      if(barVal<=0){barVal=0;dir=1;}
+      const bar=document.getElementById('dbar');
+      if(bar){
+        bar.style.left=barVal+'%';
+        bar.style.background=(barVal>=30&&barVal<=70)?'#44ff44':'#ff4444';
+      }
+    },50);
+
+    function doBrake(){
+      if(braked)return;braked=true;
+      clearInterval(descentLoop);
+      document.removeEventListener('keydown',onBrakeKey);
+      window._puzzleCleanup=null;
+      if(barVal>=30&&barVal<=70){
+        descentSeg++;
+        const msg=document.getElementById('dsegmsg');
+        if(msg){msg.style.color='#44ff44';msg.textContent='✅ 완벽한 브레이크!';}
+        setTimeout(()=>showDescentSeg(),700);
+      } else {
+        descentLives--;
+        const msg=document.getElementById('dsegmsg');
+        if(msg){msg.style.color='#ff4444';msg.textContent='💥 미끄러졌다! ❤️×'+descentLives;}
+        if(descentLives<=0){setTimeout(descentFail,700);}
+        else{setTimeout(()=>showDescentSeg(),900);}  // 같은 구간(descentSeg 증가 없음) 재시도
+      }
+    }
+    function onBrakeKey(e){if(e.code==='Space'){e.preventDefault();doBrake();}}
+    document.addEventListener('keydown',onBrakeKey);
+    window._puzzleCleanup=()=>{clearInterval(descentLoop);document.removeEventListener('keydown',onBrakeKey);braked=true;};
+    const btn=document.getElementById('brakebtn');
+    if(btn)btn.addEventListener('click',doBrake);
+  },50);
+}
+function descentFail(){
+  ChoSFX.fail();PNL.innerHTML='<h2>💥 미끄러졌다!</h2><p>경사에서 균형을 잃었다...<br><span class="mg-sub">목숨을 모두 잃었어요.</span></p>'
+    +'<button class="btn g" onclick="initGame();startGame()">4장 처음부터</button>';
+}
+function descentSuccess(){
+  if(descentLoop)clearInterval(descentLoop);
+  score+=50;
+  // 4장 세이브
+  localStorage.setItem('ch4_save',JSON.stringify({
+    score,
+    dogType:ch3Save.dogType||'chiwa',
+    strayDog:strayDogHas,
+    strayDogName:strayDogName,
+    catAbility:inventory.catAbility,
+    birdAbility:inventory.birdAbility,
+    lifePotion:inventory.lifePotion,
+    shield:inventory.shield,
+    maxHearts,
+    hearts,
+    items:inventory.items,
+    compassGot,
+    boxGot,
+  }));
+  ChoSFX.win();PNL.innerHTML='<h2>🎉 하산 성공!</h2>'
+    +'<p>산을 무사히 내려왔다!<br>저 멀리 바닷가 마을의 불빛이 보인다... 🌊<br><b style="color:#ffd700">+50점!</b></p>'
+    +(strayDogHas?'<p style="color:#C8A060">🐕 '+strayDogName+'도 함께 내려왔다.</p>':'')
+    +(compassGot?'<p style="color:#aaa">🧭 낡은 나침반이 묵직하게 주머니에 있다.</p>':'')
+    +(boxGot?'<p style="color:#aaa">📦 봉인된 상자... 열쇠는 바다에 있을까?</p>':'')
+    +'<div class="btn-row" style="margin-top:8px">'
+    +'<button class="btn g" onclick="showLeaderboard()">점수 기록 🏆</button>'
+    +'<button class="btn b" onclick="goToChapter5()">5장으로! → 🌊</button>'
+    +'<button class="btn" onclick="initGame();startGame()">처음부터</button>'
+    +'</div>';
+}
+
+// ── 5장 이동 ──────────────────────────────────────
+function goToChapter5(){
+  // ch4_save 저장 후 5장으로 이동
+  localStorage.setItem('ch4_save',JSON.stringify({
+    score,dogType:ch3Save.dogType||'chiwa',
+    strayDog:strayDogHas,strayDogName:strayDogName,
+    catAbility:inventory.catAbility,birdAbility:inventory.birdAbility,
+    catEquipped:PL.catAb,birdEquipped:PL.birdAb,
+    lifePotion:inventory.lifePotion,shield:inventory.shield,
+    maxHearts,hearts,items:inventory.items,
+    compassGot,boxGot,
+  }));
+  window.location.href='chapter5.html';
+}
+window.goToChapter5=goToChapter5;
+
+// ── 리더보드 ─────────────────────────────────────
+const LB_KEY='chobaekho_ch4_lb';
+function loadLB(){try{const r=localStorage.getItem(LB_KEY);return r?JSON.parse(r):[];}catch(e){return[];}}
+function saveLB(e){try{localStorage.setItem(LB_KEY,JSON.stringify(e));}catch(e){}}
+function addLBEntry(name,pts){let e=loadLB();const now=new Date();const d=now.getFullYear()+'.'+(now.getMonth()+1).toString().padStart(2,'0')+'.'+now.getDate().toString().padStart(2,'0');e.push({name:name||'익명',score:pts,date:d});e.sort((a,b)=>b.score-a.score);if(e.length>20)e=e.slice(0,20);saveLB(e);return e;}
+function renderLBRows(entries,hi){
+  if(!entries.length)return'<p style="color:#555;font-size:clamp(16px,2.2vw,24px)">아직 기록이 없어요!</p>';
+  return'<table style="width:100%;border-collapse:collapse;border-top:1px solid #333"><tr>'+['순위','이름','점수','날짜'].map(h=>'<th style="color:#888;font-size:clamp(14px,1.8vw,20px);padding:3px">'+h+'</th>').join('')+'</tr>'+entries.map((e,i)=>'<tr style="background:'+(i===hi?'rgba(255,215,0,0.15)':'')+'"><td style="color:#888;font-size:clamp(14px,1.8vw,20px);padding:3px">'+(i===0?'🥇':i===1?'🥈':i===2?'🥉':'#'+(i+1))+'</td><td style="color:'+(i===hi?'#fff':'#ccc')+';font-size:clamp(14px,1.8vw,20px);padding:3px">'+e.name+'</td><td style="color:#ffd700;font-size:clamp(16px,2.2vw,24px);font-weight:bold;padding:3px">'+e.score+'</td><td style="color:#555;font-size:clamp(14px,1.8vw,20px);padding:3px">'+e.date+'</td></tr>').join('')+'</table>';
+}
+window.showLeaderboard=()=>{
+  OV.style.display='flex';const entries=loadLB();
+  PNL.innerHTML='<h2>🏆 점수 기록 (4장)</h2><p style="color:#ffd700">이번 점수: <b>'+score+'</b></p>'
+    +'<div style="margin:8px 0"><input id="lb_name" maxlength="10" placeholder="이름 입력" style="background:#1a1a30;border:2px solid #ffd700;color:#fff;padding:6px 10px;font-size:clamp(16px,2.2vw,24px);font-family:Courier New;width:min(180px,60vw);text-align:center;"></div>'
+    +'<button class="btn g" onclick="submitLB()">기록 등록! 🐾</button><button class="btn b" onclick="skipLB()">그냥 보기</button>'
+    +'<div id="lb_list" style="margin-top:8px">'+renderLBRows(entries,-1)+'</div>';
+};
+window.submitLB=()=>{const inp=document.getElementById('lb_name');const name=inp?inp.value.trim():'';const entries=addLBEntry(name,score);const myIdx=entries.findIndex(e=>e.score===score&&e.name===(name||'익명'));const lb=document.getElementById('lb_list');if(lb)lb.innerHTML=renderLBRows(entries,myIdx);const btn=document.querySelector('.btn.g');if(btn){btn.textContent='✅ 등록됨!';btn.disabled=true;}};
+window.skipLB=()=>{const entries=loadLB();PNL.innerHTML='<h2>🏆 리더보드 (4장)</h2>'+renderLBRows(entries,-1)+'<button class="btn g" style="margin-top:8px" onclick="initGame();startGame()">다시 하기!</button>';};
+
+// ── startGame ─────────────────────────────────────
+function startGame(){
+  OV.style.display='none';
+  gs='playing';
+  ChoBGM.play(4);
+}
+window.startGame=startGame;
+
+// ── 메인 루프 ─────────────────────────────────────
+function loop(){
+  requestAnimationFrame(loop);cx.clearRect(0,0,W,H);frame++;
+  if(gs==='title'){drawTitle();return;}
+  if(gs!=='playing'){drawBG();drawSnakes();drawNPCs();drawPlayer();drawHUD();return;}
+  update();drawBG();drawSnakes();drawNPCs();drawPlayer();drawHUD();
+}
+OV.style.display='none';gs='title';
+initGame();
+loop();
+</script>
+</body>
+</html>

@@ -1,0 +1,1135 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>조백호의 여행 - 6장: 보물섬으로!</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:#0d1a2a;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;}
+#wrap{position:relative;width:100vw;max-height:100vh;}
+canvas#c{display:block;width:100%;height:auto;image-rendering:pixelated;cursor:pointer;}
+#ov{position:fixed;inset:0;background:rgba(0,0,0,0.82);display:none;align-items:center;justify-content:center;z-index:20;touch-action:auto;}
+.pnl{background:#0e0e1e;border:3px solid #ffd700;padding:clamp(10px,2vw,20px);max-width:min(96vw,900px);width:96%;text-align:center;color:#fff;font-family:'Courier New',monospace;max-height:92vh;overflow-y:auto;touch-action:auto;position:relative;z-index:30;}
+.pnl h2{color:#ffd700;font-size:clamp(22px,4vw,40px);margin-bottom:8px;}
+.pnl p{font-size:clamp(18px,2.5vw,26px);color:#bbb;line-height:1.8;margin-bottom:10px;}
+.btn{background:#ffd700;color:#111;border:none;padding:clamp(9px,1.4vw,18px) clamp(18px,2.7vw,32px);font-size:clamp(18px,2.8vw,32px);cursor:pointer;font-weight:700;margin:3px;font-family:'Courier New',monospace;}
+.btn:hover{background:#ffe94c;}
+.btn.g{background:#69f0ae;color:#111;}
+.btn.b{background:#82b1ff;color:#111;}
+.btn.r{background:#ff5252;color:#fff;}
+.btn.p{background:#ce93d8;color:#111;}
+.btn-row{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;}
+.tut-row{display:flex;align-items:center;gap:10px;margin:5px 0;text-align:left;}
+.tut-icon{font-size:clamp(18px,2.5vw,28px);width:clamp(24px,3vw,36px);flex-shrink:0;}
+.tut-text{font-size:clamp(16px,2.2vw,24px);color:#ccc;line-height:1.6;}
+.mg-title{color:#ffd700;font-size:clamp(20px,3.5vw,36px);}
+.mg-desc{color:#fff;font-size:clamp(16px,2.2vw,24px);}
+.mg-sub{color:#aaa;font-size:clamp(14px,1.8vw,20px);}
+.mg-hi{color:#ffd700;font-weight:bold;font-size:clamp(16px,2.2vw,24px);}
+</style>
+<script>
+// ══════════════════════════════════════════════════
+//  오디오 엔진
+// ══════════════════════════════════════════════════
+const ChoAudio=(()=>{
+  let ctx=null,muted=false,masterGain=null;
+  function getCtx(){
+    if(!ctx){ctx=new(window.AudioContext||window.webkitAudioContext)();masterGain=ctx.createGain();masterGain.gain.value=0.7;masterGain.connect(ctx.destination);}
+    if(ctx.state==='suspended')ctx.resume();return ctx;
+  }
+  return{getCtx,toggleMute(){muted=!muted;if(masterGain)masterGain.gain.value=muted?0:0.7;return muted;},isMuted(){return muted;},get master(){return masterGain;}};
+})();
+
+const ChoBGM=(()=>{
+  // ── 6장 BGM: 활기찬 항해 뱃노래 — D장조 BPM 126, 장단 리듬 ──
+  let playing=false,stopFlag=false,loopTO=null;
+  const N={
+    D3:146.8,A3:220,D4:293.7,E4:329.6,Fs4:370,G4:392,A4:440,B4:493.9,
+    D5:587.3,E5:659.3,Fs5:740,G5:784,A5:880,B5:987.8,
+    D2:73.4,A2:110,G2:98,E2:82.4,
+  };
+  function oc(f,type,start,dur,vol,atk=0.01,rel=0.08){
+    if(stopFlag)return;const c=ChoAudio.getCtx();if(ChoAudio.isMuted())return;
+    const g=c.createGain();g.gain.setValueAtTime(0,start);g.gain.linearRampToValueAtTime(vol,start+atk);
+    g.gain.linearRampToValueAtTime(vol*0.45,start+dur*0.55);g.gain.linearRampToValueAtTime(0,start+dur);
+    g.connect(ChoAudio.master||c.destination);
+    const o=c.createOscillator();o.type=type;o.frequency.value=f;o.connect(g);o.start(start);o.stop(start+dur+rel);
+  }
+  function nc(start,dur,vol,lpF){
+    if(stopFlag)return;const c=ChoAudio.getCtx();if(ChoAudio.isMuted())return;
+    const buf=c.createBuffer(1,Math.ceil(c.sampleRate*dur),c.sampleRate);
+    const d=buf.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=(Math.random()*2-1);
+    const src=c.createBufferSource();src.buffer=buf;
+    const lp=c.createBiquadFilter();lp.type='lowpass';lp.frequency.value=lpF;
+    const g=c.createGain();g.gain.setValueAtTime(vol,start);g.gain.linearRampToValueAtTime(0,start+dur);
+    src.connect(lp);lp.connect(g);g.connect(ChoAudio.master||c.destination);src.start(start);
+  }
+  function playLoop(){
+    if(stopFlag){playing=false;return;}
+    const c=ChoAudio.getCtx(),t=c.currentTime;
+    const bpm=126,beat=60/bpm,bar=beat*4;
+
+    // ── 멜로디: 신나는 뱃노래 (D장조, 헤미올라 느낌) ──
+    const mel=[
+      // A파트 (4마디)
+      [N.D5,0.5],[N.Fs5,0.5],[N.A5,0.5],[N.Fs5,0.5],
+      [N.E5,0.5],[N.D5,0.5],[N.E5,1.0],[0,0.5],
+      [N.G5,0.5],[N.Fs5,0.5],[N.E5,0.5],[N.D5,0.5],
+      [N.Fs5,0.5],[N.A5,0.5],[N.D5,2.0],[0,0.5],
+      // B파트 (4마디)
+      [N.A5,0.5],[N.G5,0.5],[N.Fs5,0.5],[N.E5,0.5],
+      [N.D5,0.5],[N.E5,0.5],[N.Fs5,1.0],[0,0.5],
+      [N.B5,0.5],[N.A5,0.5],[N.G5,0.5],[N.Fs5,0.5],
+      [N.E5,0.5],[N.D5,0.5],[N.D5,2.5],[0,0.5],
+    ];
+    let mt=t;
+    mel.forEach(([f,dur])=>{if(f>0)oc(f,'square',mt,dur*beat*0.82,0.11);mt+=dur*beat;});
+
+    // ── 하모니 (3도 아래 병행) ──
+    const har=[
+      [N.B4,0],[N.D5,1],[N.Fs5,2],[N.D5,3],
+      [N.E5,4],[N.B4,5],[N.D5,6],[0,7],
+      [N.E5,8],[N.D5,9],[N.B4,10],[N.A4,11],
+      [N.D5,12],[N.Fs5,13],[N.A4,14],[0,15],
+    ];
+    har.forEach(([f,b])=>{if(f>0)oc(f,'triangle',t+b*beat,beat*0.78,0.07);});
+
+    // ── 리듬 화음 (쿵짝짝 장단) ──
+    // 코드 진행: D - G - A - D
+    const chords=[
+      {fs:[N.D3,N.Fs4,N.A4],b:0},{fs:[N.D3,N.Fs4,N.A4],b:0.5},
+      {fs:[N.G2,N.D4,N.G4],b:2},{fs:[N.G2,N.D4,N.G4],b:2.5},
+      {fs:[N.A2,N.E4,N.A4],b:4},{fs:[N.A2,N.E4,N.A4],b:4.5},
+      {fs:[N.D3,N.Fs4,N.A4],b:6},{fs:[N.D3,N.Fs4,N.A4],b:6.5},
+      {fs:[N.D3,N.Fs4,N.A4],b:8},{fs:[N.D3,N.Fs4,N.A4],b:8.5},
+      {fs:[N.A2,N.E4,N.A4],b:10},{fs:[N.G2,N.D4,N.B4],b:12},
+      {fs:[N.A2,N.E4,N.A4],b:14},{fs:[N.D3,N.Fs4,N.A4],b:15},
+    ];
+    chords.forEach(({fs,b})=>fs.forEach((f,i)=>oc(f,'triangle',t+b*beat+i*0.02,beat*0.5,0.07)));
+
+    // ── 베이스 (쿵! 강박) ──
+    [[N.D2,0],[N.D2,1],[N.G2,2],[N.G2,3],
+     [N.A2,4],[N.A2,5],[N.D2,6],[N.D2,7],
+     [N.D2,8],[N.D2,9],[N.A2,10],[N.A2,11],
+     [N.G2,12],[N.A2,14],[N.D2,15]].forEach(([f,b])=>{
+      oc(f/2,'triangle',t+b*beat,beat*0.9,0.30,0.005,0.18);
+    });
+
+    // ── 타악 (하이햇 + 킥 느낌) ──
+    for(let b=0;b<16;b++){
+      // 강박 킥
+      if(b%2===0)nc(t+b*beat,beat*0.18,0.06,180);
+      // 오프비트 하이햇
+      else nc(t+b*beat,beat*0.12,0.025,900);
+      // 추가 셋잇단 장단
+      nc(t+b*beat+beat*0.33,beat*0.08,0.014,700);
+      nc(t+b*beat+beat*0.66,beat*0.08,0.014,700);
+    }
+
+    // ── 반짝임 장식음 (선율 위) ──
+    [[N.D5*2,0],[N.Fs5*2,2],[N.A5*2,4],[N.E5*2,6],
+     [N.A5*2,8],[N.B5*2,10],[N.Fs5*2,12],[N.D5*2,15]].forEach(([f,b])=>{
+      oc(f,'sine',t+b*beat,beat*0.18,0.04,0.003,0.04);
+    });
+
+    const loopDur=bar*4;
+    loopTO=setTimeout(playLoop,(loopDur-0.05)*1000);
+  }
+  return{
+    play(){if(playing)return;stopFlag=false;playing=true;ChoAudio.getCtx();playLoop();},
+    stop(){stopFlag=true;playing=false;if(loopTO)clearTimeout(loopTO);},
+    pause(){stopFlag=true;if(loopTO)clearTimeout(loopTO);},
+    resume(){if(!playing){stopFlag=false;playing=true;playLoop();}},
+  };
+})();
+
+const ChoSFX=(()=>{
+  function oc(f,type,dur,vol,t0){
+    const c=ChoAudio.getCtx(),t=t0||c.currentTime;
+    const g=c.createGain();g.gain.setValueAtTime(vol,t);g.gain.exponentialRampToValueAtTime(0.001,t+dur);
+    g.connect(ChoAudio.master||c.destination);
+    const o=c.createOscillator();o.type=type;o.frequency.value=f;o.connect(g);o.start(t);o.stop(t+dur+0.05);
+  }
+  function nc(dur,vol,lpF,t0){
+    const c=ChoAudio.getCtx(),t=t0||c.currentTime;
+    const buf=c.createBuffer(1,Math.ceil(c.sampleRate*dur),c.sampleRate);
+    const d=buf.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=(Math.random()*2-1);
+    const src=c.createBufferSource();src.buffer=buf;
+    const lp=c.createBiquadFilter();lp.type='lowpass';lp.frequency.value=lpF;
+    const g=c.createGain();g.gain.setValueAtTime(vol,t);g.gain.exponentialRampToValueAtTime(0.001,t+dur);
+    src.connect(lp);lp.connect(g);g.connect(ChoAudio.master||c.destination);src.start(t);
+  }
+  return{
+    hit(){ChoAudio.getCtx();if(ChoAudio.isMuted())return;nc(0.18,0.3,200);oc(110,'sine',0.15,0.22);},
+    item(){ChoAudio.getCtx();if(ChoAudio.isMuted())return;const t=ChoAudio.getCtx().currentTime;[880,1100,1320].forEach((f,i)=>oc(f,'sine',0.12,0.16,t+i*0.08));},
+    win(){ChoAudio.getCtx();if(ChoAudio.isMuted())return;const t=ChoAudio.getCtx().currentTime;[523,659,784,1047].forEach((f,i)=>oc(f,'square',0.18,0.12,t+i*0.10));},
+    fail(){ChoAudio.getCtx();if(ChoAudio.isMuted())return;const t=ChoAudio.getCtx().currentTime;oc(440,'sawtooth',0.15,0.18,t);oc(294,'sawtooth',0.18,0.18,t+0.12);},
+    npc(){ChoAudio.getCtx();if(ChoAudio.isMuted())return;const t=ChoAudio.getCtx().currentTime;oc(523,'triangle',0.2,0.14,t);oc(659,'triangle',0.22,0.14,t+0.14);},
+    land(){ChoAudio.getCtx();if(ChoAudio.isMuted())return;const t=ChoAudio.getCtx().currentTime;[392,494,587,784,987].forEach((f,i)=>oc(f,'square',0.22,0.14,t+i*0.11));},
+    siren(){ChoAudio.getCtx();if(ChoAudio.isMuted())return;const t=ChoAudio.getCtx().currentTime;[660,880,1100,880,660,440].forEach((f,i)=>oc(f,'sine',0.22,0.12,t+i*0.12));},
+  };
+})();
+</script>
+</head>
+<body>
+<div id="wrap">
+  <canvas id="c" width="800" height="416"></canvas>
+  <div id="ov"><div class="pnl" id="pnl"></div></div>
+</div>
+<script>
+const CV=document.getElementById('c'),cx=CV.getContext('2d');
+cx.imageSmoothingEnabled=false;
+const OV=document.getElementById('ov'),PNL=document.getElementById('pnl');
+const W=800,H=416,PS=3;
+function fillR(x,y,w,h,col){cx.fillStyle=col;cx.fillRect(x,y,w,h);}
+
+// ══════════════════════════════════════════════════
+//  상수
+// ══════════════════════════════════════════════════
+const HORIZON=H*0.43;   // 수평선 y
+const SEA_TOP=HORIZON;  // 바다 시작
+const SEA_BOT=H-28;     // 바다 하단 (진행 바 위)
+const BX=W*0.30;        // 배 고정 x
+// 배+캐릭터의 y 이동 범위 (배 중심 기준)
+const BOAT_Y_MIN=SEA_TOP+28;
+const BOAT_Y_MAX=SEA_BOT-28;
+const SAIL_TOTAL=4200;  // 총 항해 프레임 (70초@60fps)
+
+// ══════════════════════════════════════════════════
+//  전역 상태
+// ══════════════════════════════════════════════════
+let gs='title',frame=0,score=0;
+let sailProgress=0,landingDone=false;
+let ch5Save={},inventory={lifePotion:0,shield:0,catAbility:false,birdAbility:false,items:[]};
+let hearts=5,maxHearts=5;
+let hasInvincible=false,invincibleTimer=0;
+let popups=[];
+
+// 배 상태
+let boatY=0;          // 배 중심 y (화면 절대 좌표)
+let boatVY=0;         // 배 y 속도
+const BOAT_SPD=5.5;   // 수직 이동 속도
+let bobVal=0,tiltVal=0;
+
+// 장애물
+let obstacles=[];
+let obsTimer=0;
+
+// 세이렌 이벤트
+let sirenTriggered=false,sirenDone=false;
+let sirenSuccess=false; // 세이렌 퀴즈 결과
+
+// 섬 페이드
+let islandAlpha=0;
+let plArmUp=false;
+
+// 구름/갈매기
+let clouds=[],seagulls=[];
+
+const pauseBtnRect={x:W-60,y:6,w:52,h:36};
+const MB={up:{x:W-100,y:H-96,w:88,h:40},down:{x:W-100,y:H-52,w:88,h:40}};
+function inBtn(b,tx,ty){return tx>=b.x&&tx<=b.x+b.w&&ty>=b.y&&ty<=b.y+b.h;}
+const keys={};
+const mobileUp={pressed:false},mobileDn={pressed:false};
+
+// ══════════════════════════════════════════════════
+//  초기화
+// ══════════════════════════════════════════════════
+function initGame(){
+  try{ch5Save=JSON.parse(localStorage.getItem('ch5_save')||'{}');}catch(e){ch5Save={};}
+  maxHearts=ch5Save.maxHearts||5;
+  hearts=Math.min(ch5Save.hearts||5,maxHearts);
+  const rawItems=(ch5Save.items||[]).filter(it=>!it.ch3only&&!it.isPaperBoat);
+  inventory={
+    lifePotion:ch5Save.lifePotion||0,shield:ch5Save.shield||0,
+    catAbility:!!(ch5Save.catAbility),birdAbility:!!(ch5Save.birdAbility),items:rawItems,
+  };
+  score=ch5Save.score||0;frame=0;sailProgress=0;landingDone=false;
+  islandAlpha=0;plArmUp=false;bobVal=0;tiltVal=0;
+  hasInvincible=false;invincibleTimer=0;popups=[];
+  boatY=(BOAT_Y_MIN+BOAT_Y_MAX)/2;boatVY=0;
+  obstacles=[];obsTimer=0;
+  sirenTriggered=false;sirenDone=false;sirenSuccess=false;
+  clouds=[];for(let i=0;i<10;i++)clouds.push({x:Math.random()*W,y:20+Math.random()*90,r:18+Math.random()*38,speed:0.22+Math.random()*0.38,far:i<5});
+  seagulls=[];for(let i=0;i<5;i++)seagulls.push({x:Math.random()*W,y:35+Math.random()*80,vx:0.32+Math.random()*0.45,wb:Math.random()*Math.PI*2,wa:0,wd:1});
+  ChoBGM.stop(); // 재시작 시 확실히 정지
+}
+
+// ══════════════════════════════════════════════════
+//  입력
+// ══════════════════════════════════════════════════
+document.addEventListener('keydown',e=>{
+  keys[e.code]=true;
+  ['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space'].includes(e.code)&&e.preventDefault();
+  if(gs==='title'&&(e.code==='Space'||e.code==='Enter'))showTutorial();
+  else if(gs==='howto'&&(e.code==='Space'||e.code==='Enter'))nextTut();
+  else if(gs==='playing'){
+    if(e.code==='KeyP')togglePause();
+    if(e.code==='KeyB')toggleInv();
+  }
+  else if(gs==='paused'&&e.code==='KeyP')togglePause();
+  else if(gs==='inv'&&e.code==='KeyB')toggleInv();
+});
+document.addEventListener('keyup',e=>{keys[e.code]=false;});
+// 인벤 버튼 영역 (HUD)
+const invBtnRect={x:W-218,y:44,w:82,h:26};
+CV.addEventListener('click',e=>{
+  const r=CV.getBoundingClientRect();
+  const tx=(e.clientX-r.left)*(W/r.width),ty=(e.clientY-r.top)*(H/r.height);
+  if(gs==='title'){showTutorial();return;}
+  if(gs==='howto'){nextTut();return;}
+  if(gs==='playing'){
+    if(tx>=W-122&&tx<=W-74&&ty>=8&&ty<=42){ChoAudio.toggleMute();return;}
+    if(inBtn(pauseBtnRect,tx,ty)){togglePause();return;}
+    if(inBtn(invBtnRect,tx,ty)){toggleInv();return;}
+  }
+  if(gs==='inv'){toggleInv();return;}
+});
+CV.addEventListener('touchstart',e=>{
+  if(OV.style.display==='flex')return;
+  e.preventDefault();
+  const r=CV.getBoundingClientRect();
+  Array.from(e.changedTouches).forEach(t=>{
+    const tx=(t.clientX-r.left)*(W/r.width),ty=(t.clientY-r.top)*(H/r.height);
+    if(gs==='title'){showTutorial();return;}
+    if(gs==='howto'){nextTut();return;}
+    if(gs==='playing'){
+      if(tx>=W-122&&tx<=W-74&&ty>=8&&ty<=42){ChoAudio.toggleMute();return;}
+      if(inBtn(pauseBtnRect,tx,ty)){togglePause();return;}
+      if(inBtn(invBtnRect,tx,ty)){toggleInv();return;}
+      if(inBtn(MB.up,tx,ty)){mobileUp.pressed=true;}
+      if(inBtn(MB.down,tx,ty)){mobileDn.pressed=true;}
+    }
+    if(gs==='inv'){toggleInv();return;}
+  });
+},{passive:false});
+CV.addEventListener('touchend',e=>{
+  if(OV.style.display==='flex')return;
+  e.preventDefault();
+  const r=CV.getBoundingClientRect();
+  // 남아있는 터치로 버튼 상태 재계산
+  const pts=Array.from(e.touches).map(t=>({x:(t.clientX-r.left)*(W/r.width),y:(t.clientY-r.top)*(H/r.height)}));
+  mobileUp.pressed=pts.some(p=>inBtn(MB.up,p.x,p.y));
+  mobileDn.pressed=pts.some(p=>inBtn(MB.down,p.x,p.y));
+},{passive:false});
+CV.addEventListener('touchmove',e=>{
+  if(OV.style.display==='flex')return;
+  e.preventDefault();
+  if(gs!=='playing')return;
+  const r=CV.getBoundingClientRect();
+  const pts=Array.from(e.touches).map(t=>({x:(t.clientX-r.left)*(W/r.width),y:(t.clientY-r.top)*(H/r.height)}));
+  mobileUp.pressed=pts.some(p=>inBtn(MB.up,p.x,p.y));
+  mobileDn.pressed=pts.some(p=>inBtn(MB.down,p.x,p.y));
+},{passive:false});
+
+// ══════════════════════════════════════════════════
+//  장애물 스폰
+// ══════════════════════════════════════════════════
+// 장애물 종류: fish, octopus, jellyfish, crab, turtle
+const OBS_TYPES=['fish','octopus','jellyfish','turtle','crab'];
+function spawnObs(){
+  // 큰 바위 (50% 지점)은 별도 처리
+  const type=OBS_TYPES[Math.floor(Math.random()*OBS_TYPES.length)];
+  const oy=BOAT_Y_MIN+Math.random()*(BOAT_Y_MAX-BOAT_Y_MIN);
+  const speed=2.2+Math.random()*2.2+sailProgress*1.5;
+  obstacles.push({type,x:W+40,y:oy,speed,hit:false,wobble:Math.random()*Math.PI*2,wdir:Math.random()>.5?1:-1});
+}
+
+// ══════════════════════════════════════════════════
+//  업데이트
+// ══════════════════════════════════════════════════
+function update(){
+  if(gs!=='playing')return;
+  frame++;
+
+  // ── 배 상하 이동 ──
+  const goUp=keys['ArrowUp']||keys['KeyW']||mobileUp.pressed;
+  const goDn=keys['ArrowDown']||keys['KeyS']||mobileDn.pressed;
+  if(goUp)boatVY=Math.max(boatVY-1.2,-BOAT_SPD);
+  else if(goDn)boatVY=Math.min(boatVY+1.2,BOAT_SPD);
+  else boatVY*=0.82; // 감쇠
+  boatY=Math.max(BOAT_Y_MIN,Math.min(BOAT_Y_MAX,boatY+boatVY));
+
+  // 배 자연 흔들림 (미세)
+  bobVal=Math.sin(frame*0.022)*3+Math.sin(frame*0.047)*1.2;
+  tiltVal=Math.sin(frame*0.018)*0.04+boatVY*0.004;
+
+  // 팔 애니
+  plArmUp=Math.floor(frame/18)%2===0;
+
+  // 무적
+  if(invincibleTimer>0){invincibleTimer--;if(invincibleTimer===0)hasInvincible=false;}
+
+  // 항해 진행 (score는 5장 누적 기반, 매 프레임 덮어쓰지 않음)
+  sailProgress=Math.min(1,sailProgress+1/SAIL_TOTAL);
+  if(frame%60===0)score++; // 초당 1점 적립
+
+  // 구름/갈매기
+  clouds.forEach(cl=>{cl.x-=cl.speed*(cl.far?0.4:0.85);if(cl.x<-cl.r*3)cl.x=W+cl.r*3;});
+  seagulls.forEach(s=>{s.x+=s.vx;s.wb+=0.04;s.y+=Math.sin(s.wb)*0.3;s.wa+=0.12*s.wd;if(Math.abs(s.wa)>0.44)s.wd*=-1;if(s.x>W+30){s.x=-10;s.y=35+Math.random()*80;}});
+
+  // 섬 등장
+  if(sailProgress>0.72)islandAlpha=Math.min(1,(sailProgress-0.72)/0.28);
+
+  // ── 장애물 스폰 ──
+  if(!sirenTriggered||sirenDone){
+    obsTimer++;
+    const interval=Math.max(55,120-sailProgress*80); // 진행할수록 자주
+    if(obsTimer>interval){obsTimer=0;spawnObs();}
+  }
+
+  // ── 장애물 이동 & 충돌 ──
+  const bx=BX,by=boatY+bobVal;
+  obstacles.forEach(ob=>{
+    ob.wobble+=0.06*ob.wdir;
+    ob.x-=ob.speed;
+    if(ob.hit||ob.x<-60)return;
+    // 충돌 판정 (배 선체 범위: ±70 x, ±25 y)
+    if(!hasInvincible&&!ob.hit){
+      if(Math.abs(ob.x-bx)<62&&Math.abs(ob.y-by)<28){
+        ob.hit=true;
+        hearts=Math.max(0,hearts-1);
+        score=Math.max(0,score-10);
+        ChoSFX.hit();
+        popups.push({x:ob.x,y:ob.y,t:'-1 ❤️ -10점',c:'#ff5252',life:70});
+        if(hearts<=0){gs='over';ChoBGM.stop();showGameOver();}
+      }
+    }
+  });
+  obstacles=obstacles.filter(ob=>ob.x>-80);
+
+  // ── 세이렌 바위 이벤트 (50%) ──
+  if(!sirenTriggered&&sailProgress>=0.5){
+    sirenTriggered=true;
+    gs='puzzle';OV.style.display='flex';ChoBGM.pause();
+    ChoSFX.siren();
+    showSirenApproach();
+  }
+
+  // ── 도착 ──
+  if(sailProgress>=1.0&&!landingDone){
+    landingDone=true;gs='done';ChoBGM.stop();
+    setTimeout(()=>{ChoSFX.land();showLandingPanel();},500);
+  }
+
+  popups=popups.filter(p=>{p.life--;p.y-=0.5;return p.life>0;});
+}
+
+// ══════════════════════════════════════════════════
+//  배경
+// ══════════════════════════════════════════════════
+function drawBG(){
+  // 하늘
+  const sky=cx.createLinearGradient(0,0,0,HORIZON);
+  sky.addColorStop(0,'#4AB8F0');sky.addColorStop(0.55,'#7AD0F8');sky.addColorStop(1,'#A8E8FF');
+  cx.fillStyle=sky;cx.fillRect(0,0,W,HORIZON);
+  clouds.filter(c=>c.far).forEach(drawCloud);
+  // 바다
+  const sea=cx.createLinearGradient(0,HORIZON,0,H);
+  sea.addColorStop(0,'#3AACE0');sea.addColorStop(0.3,'#2A8EC8');sea.addColorStop(0.75,'#1A6EA8');sea.addColorStop(1,'#0E4A78');
+  cx.fillStyle=sea;cx.fillRect(0,HORIZON,W,H-HORIZON);
+  clouds.filter(c=>!c.far).forEach(drawCloud);
+  // 잔물결
+  for(let ly=0;ly<3;ly++){
+    const oy=HORIZON+12+ly*26,amp=3+ly*2,freq=0.018-ly*0.004,spd=frame*(0.013+ly*0.006);
+    cx.strokeStyle=`rgba(180,230,255,${0.15-ly*0.04})`;cx.lineWidth=1+ly*0.4;
+    cx.beginPath();for(let x=0;x<=W;x+=3){const y=oy+Math.sin(x*freq+spd)*amp;x===0?cx.moveTo(x,y):cx.lineTo(x,y);}cx.stroke();
+  }
+  // 태양
+  const sx=W*0.76,sy=50;
+  cx.fillStyle='rgba(255,245,175,0.95)';cx.beginPath();cx.arc(sx,sy,20,0,Math.PI*2);cx.fill();
+  cx.fillStyle='rgba(255,240,100,0.25)';cx.beginPath();cx.arc(sx,sy,36,0,Math.PI*2);cx.fill();
+  cx.save();cx.translate(sx,sy);
+  for(let i=0;i<8;i++){const a=i*Math.PI/4+frame*0.004,len=14+Math.sin(frame*0.05+i)*6;cx.strokeStyle='rgba(255,240,80,0.14)';cx.lineWidth=3.5;cx.beginPath();cx.moveTo(Math.cos(a)*22,Math.sin(a)*22);cx.lineTo(Math.cos(a)*(22+len),Math.sin(a)*(22+len));cx.stroke();}
+  cx.restore();
+  // 수면 반사
+  for(let i=0;i<5;i++){
+    const rx=((sx+i*80-frame*0.32)%W+W)%W,ry=HORIZON+18+i*14+Math.sin(frame*0.03+i)*4,rl=26+i*7;
+    const rg=cx.createLinearGradient(rx-rl,ry,rx+rl,ry);
+    rg.addColorStop(0,'rgba(255,248,180,0)');rg.addColorStop(0.5,'rgba(255,248,180,0.18)');rg.addColorStop(1,'rgba(255,248,180,0)');
+    cx.fillStyle=rg;cx.fillRect(rx-rl,ry-2,rl*2,5);
+  }
+  // 갈매기
+  seagulls.forEach(s=>{cx.strokeStyle='rgba(30,30,30,0.6)';cx.lineWidth=1.5;cx.beginPath();cx.moveTo(s.x-5,s.y+Math.sin(s.wa)*3);cx.quadraticCurveTo(s.x,s.y-3,s.x+5,s.y+Math.sin(-s.wa)*3);cx.stroke();});
+  // 보물섬
+  if(islandAlpha>0){
+    cx.globalAlpha=islandAlpha;
+    drawIsland(W*0.80,HORIZON+2,1);
+    if(islandAlpha>0.45){cx.fillStyle='#ffd700';cx.font='bold 11px Courier New';cx.textAlign='center';cx.globalAlpha=islandAlpha;cx.fillText('★ 보물섬',W*0.80,HORIZON-8);}
+    cx.globalAlpha=1;
+  }
+  // 세이렌 바위 (50% 근처에 등장 예고)
+  if(sirenTriggered&&!sirenDone){
+    // 배경이 어두워짐
+    cx.fillStyle='rgba(20,10,40,0.32)';cx.fillRect(0,0,W,H);
+  }
+}
+
+// ── 섬 ──────────────────────────────────────────
+function drawIsland(ix,iy,a){
+  cx.globalAlpha=islandAlpha*a;
+  cx.fillStyle='rgba(20,70,30,0.22)';cx.beginPath();cx.ellipse(ix,iy+12,88,13,0,0,Math.PI*2);cx.fill();
+  cx.fillStyle='#D4B87A';cx.beginPath();cx.ellipse(ix,iy,76,26,0,0,Math.PI*2);cx.fill();
+  cx.fillStyle='#8DB87A';cx.beginPath();cx.ellipse(ix,iy-5,62,18,0,0,Math.PI*2);cx.fill();
+  drawPalmTree(ix-26,iy-20);drawPalmTree(ix,iy-26);drawPalmTree(ix+26,iy-19);
+  cx.globalAlpha=1;
+}
+function drawPalmTree(x,y){
+  cx.fillStyle='#7A5010';cx.fillRect(x-2,y,5,20);
+  cx.fillStyle='#3A8828';
+  [[-0.6,-0.3],[-0.05,0.25],[0.55,0.85],[1.15,1.45]].forEach(([a1,a2])=>{
+    cx.beginPath();cx.moveTo(x,y);cx.quadraticCurveTo(x+Math.cos(a1)*20,y+Math.sin(a1)*17,x+Math.cos(a2)*28,y+Math.sin(a2)*10);cx.quadraticCurveTo(x+Math.cos((a1+a2)/2)*14,y+Math.sin((a1+a2)/2)*8,x,y);cx.fill();
+  });
+}
+function drawCloud(cl){
+  cx.fillStyle='rgba(255,255,255,0.84)';
+  cx.beginPath();cx.arc(cl.x,cl.y,cl.r,0,Math.PI*2);cx.fill();
+  cx.beginPath();cx.arc(cl.x-cl.r*.65,cl.y+cl.r*.32,cl.r*.72,0,Math.PI*2);cx.fill();
+  cx.beginPath();cx.arc(cl.x+cl.r*.65,cl.y+cl.r*.28,cl.r*.68,0,Math.PI*2);cx.fill();
+}
+
+// ══════════════════════════════════════════════════
+//  장애물 픽셀 아트 그리기
+// ══════════════════════════════════════════════════
+function drawObstacles(){
+  obstacles.forEach(ob=>{
+    if(ob.hit&&ob.x<0)return;
+    const wobble=Math.sin(ob.wobble)*5;
+    cx.save();
+    cx.translate(ob.x,ob.y+wobble);
+    if(ob.hit){cx.globalAlpha=0.3;}
+    switch(ob.type){
+      case 'fish':    drawFish();    break;
+      case 'octopus': drawOctopus(); break;
+      case 'jellyfish':drawJellyfish();break;
+      case 'turtle':  drawTurtle();  break;
+      case 'crab':    drawCrab();    break;
+    }
+    cx.globalAlpha=1;
+    cx.restore();
+  });
+}
+
+// 픽셀 도우미
+function px(col,x,y,w=3,h=3){cx.fillStyle=col;cx.fillRect(x,y,w,h);}
+
+// 물고기 (오렌지/흰줄, 왼쪽으로 헤엄)
+function drawFish(){
+  const s=3;
+  // 몸통
+  px('#F06020',-14,-6,28,12);
+  px('#FF8840',-11,-9,22,18);
+  px('#FF7030',-14,-3,28,6);
+  // 흰 배
+  px('#FFF0D8',-10,-3,20,6);
+  // 눈
+  px('#000',8,-3,3,3);
+  px('#FFF',9,-2,1,1);
+  // 꼬리
+  cx.fillStyle='#E05010';
+  cx.beginPath();cx.moveTo(-14,0);cx.lineTo(-26,-10);cx.lineTo(-24,0);cx.lineTo(-26,10);cx.closePath();cx.fill();
+  // 지느러미
+  px('#E05010',-4,-12,12,6);
+  px('#E05010',-2,6,10,5);
+  // 입
+  px('#CC3010',11,0,4,3);
+}
+
+// 문어 (보라, 다리 8개)
+function drawOctopus(){
+  // 머리 (타원)
+  cx.fillStyle='#8844CC';cx.beginPath();cx.ellipse(0,-8,18,16,0,0,Math.PI*2);cx.fill();
+  cx.fillStyle='#AA66EE';cx.beginPath();cx.ellipse(0,-10,14,12,0,0,Math.PI*2);cx.fill();
+  // 눈
+  cx.fillStyle='#FFF';cx.beginPath();cx.ellipse(-7,-10,5,6,0,0,Math.PI*2);cx.fill();
+  cx.beginPath();cx.ellipse(7,-10,5,6,0,0,Math.PI*2);cx.fill();
+  cx.fillStyle='#000';cx.beginPath();cx.ellipse(-7,-10,3,4,0,0,Math.PI*2);cx.fill();
+  cx.beginPath();cx.ellipse(7,-10,3,4,0,0,Math.PI*2);cx.fill();
+  // 다리 (굽은 선)
+  cx.strokeStyle='#8844CC';cx.lineWidth=3;
+  [[-16,0],[-10,0],[-4,0],[2,0],[8,0],[14,0]].forEach(([lx],i)=>{
+    const ox=-14+i*5.5;
+    cx.beginPath();cx.moveTo(ox,2);cx.quadraticCurveTo(ox+Math.sin(i)*4,12,ox+Math.cos(i)*3,22);cx.stroke();
+  });
+  // 점
+  [[-6,-14],[6,-14]].forEach(([ex,ey])=>{cx.fillStyle='rgba(255,255,255,0.5)';cx.beginPath();cx.arc(ex,ey,2,0,Math.PI*2);cx.fill();});
+}
+
+// 해파리 (분홍/파란 반투명)
+function drawJellyfish(){
+  cx.fillStyle='rgba(255,160,200,0.7)';cx.beginPath();cx.ellipse(0,-8,16,14,0,0,Math.PI,true);cx.fill();
+  cx.fillStyle='rgba(255,200,225,0.5)';cx.beginPath();cx.ellipse(0,-8,10,9,0,0,Math.PI,true);cx.fill();
+  cx.fillStyle='rgba(255,140,190,0.6)';cx.beginPath();cx.arc(0,-8,16,0,Math.PI,false);cx.fill();
+  // 촉수 (꾸불꾸불)
+  cx.strokeStyle='rgba(255,160,200,0.55)';cx.lineWidth=1.5;
+  [-10,-5,0,5,10].forEach((tx,i)=>{
+    const wobble=Math.sin(frame*0.08+i*1.2)*5;
+    cx.beginPath();cx.moveTo(tx,4);cx.quadraticCurveTo(tx+wobble,12,tx-wobble*0.5,22);cx.stroke();
+  });
+}
+
+// 거북이
+function drawTurtle(){
+  // 등껍질
+  cx.fillStyle='#4A8A30';cx.beginPath();cx.ellipse(0,0,20,14,0,0,Math.PI*2);cx.fill();
+  cx.fillStyle='#5AAA38';cx.beginPath();cx.ellipse(0,-1,16,11,0,0,Math.PI*2);cx.fill();
+  // 등껍질 무늬
+  cx.strokeStyle='#3A6A20';cx.lineWidth=1.2;
+  cx.beginPath();cx.moveTo(-6,-5);cx.lineTo(0,-8);cx.lineTo(6,-5);cx.lineTo(4,2);cx.lineTo(-4,2);cx.closePath();cx.stroke();
+  cx.beginPath();cx.moveTo(-12,0);cx.lineTo(-6,-5);cx.stroke();cx.beginPath();cx.moveTo(12,0);cx.lineTo(6,-5);cx.stroke();
+  // 머리
+  cx.fillStyle='#3A7028';cx.beginPath();cx.ellipse(18,0,9,7,0.3,0,Math.PI*2);cx.fill();
+  cx.fillStyle='#000';cx.beginPath();cx.arc(22,-1,2,0,Math.PI*2);cx.fill();
+  // 발
+  cx.fillStyle='#3A7028';
+  [[-16,-8],[-16,8],[14,-8],[14,8]].forEach(([fx,fy])=>cx.fillRect(fx-4,fy-3,8,6));
+}
+
+// 꽃게
+function drawCrab(){
+  // 몸
+  cx.fillStyle='#CC3010';cx.beginPath();cx.ellipse(0,0,18,12,0,0,Math.PI*2);cx.fill();
+  cx.fillStyle='#DD4820';cx.beginPath();cx.ellipse(0,-1,14,9,0,0,Math.PI*2);cx.fill();
+  // 눈자루
+  cx.fillStyle='#111';cx.beginPath();cx.arc(-8,-9,4,0,Math.PI*2);cx.fill();cx.beginPath();cx.arc(8,-9,4,0,Math.PI*2);cx.fill();
+  cx.fillStyle='#FF5050';cx.fillRect(-10,-10,4,4);cx.fillRect(6,-10,4,4);
+  // 다리
+  cx.strokeStyle='#CC3010';cx.lineWidth=2.5;
+  [[-18,-4,-28,-12],[-18,0,-30,-2],[-18,6,-28,14],[18,-4,28,-12],[18,0,30,-2],[18,6,28,14]].forEach(([x1,y1,x2,y2])=>{
+    cx.beginPath();cx.moveTo(x1,y1);cx.lineTo(x2,y2);cx.stroke();
+  });
+  // 집게
+  cx.fillStyle='#AA2008';
+  cx.beginPath();cx.moveTo(-20,-8);cx.lineTo(-32,-18);cx.lineTo(-28,-10);cx.lineTo(-32,-4);cx.closePath();cx.fill();
+  cx.beginPath();cx.moveTo(20,-8);cx.lineTo(32,-18);cx.lineTo(28,-10);cx.lineTo(32,-4);cx.closePath();cx.fill();
+}
+
+// ══════════════════════════════════════════════════
+//  배 + 캐릭터
+// ══════════════════════════════════════════════════
+function drawBoatAndPlayer(){
+  const by=boatY+bobVal;
+  cx.save();cx.translate(BX,by);cx.rotate(tiltVal);
+
+  // 배 그림자
+  cx.fillStyle='rgba(0,40,90,0.14)';cx.beginPath();cx.ellipse(0,22,85,12,0,0,Math.PI*2);cx.fill();
+  // 선체
+  cx.fillStyle='#8B5A1A';
+  cx.beginPath();cx.moveTo(-80,-10);cx.lineTo(80,-10);cx.quadraticCurveTo(98,2,88,18);cx.lineTo(-88,18);cx.quadraticCurveTo(-98,2,-80,-10);cx.closePath();cx.fill();
+  cx.fillStyle='#7A4C12';cx.fillRect(-80,-10,160,5);
+  cx.fillStyle='#9A6A28';cx.fillRect(-72,-14,144,6);
+  cx.fillStyle='rgba(255,255,255,0.10)';for(let xi=-70;xi<72;xi+=16)cx.fillRect(xi,-14,9,5);
+  cx.fillStyle='#C88020';cx.beginPath();cx.moveTo(88,0);cx.lineTo(104,-4);cx.lineTo(102,5);cx.closePath();cx.fill();
+  cx.fillStyle='#C88020';cx.fillRect(-88,-2,6,16);cx.fillRect(-92,-2,16,4);
+  // 돛대
+  cx.fillStyle='#5A3808';cx.fillRect(-3,-94,6,84);
+  cx.fillStyle='#4A3006';cx.fillRect(-36,-86,72,4);
+  // 돛
+  cx.fillStyle='#F5EDD4';
+  cx.beginPath();cx.moveTo(0,-88);cx.lineTo(54,-52);cx.lineTo(54,-14);cx.lineTo(-54,-14);cx.lineTo(-54,-52);cx.closePath();cx.fill();
+  cx.strokeStyle='rgba(140,110,65,0.5)';cx.lineWidth=1;
+  cx.beginPath();cx.moveTo(0,-88);cx.lineTo(88,-8);cx.stroke();
+  cx.beginPath();cx.moveTo(0,-88);cx.lineTo(-82,-8);cx.stroke();
+  // 깃발
+  cx.fillStyle='#ffd700';cx.beginPath();cx.moveTo(0,-95);cx.lineTo(20,-87);cx.lineTo(0,-79);cx.closePath();cx.fill();
+  // 물보라
+  for(let i=0;i<4;i++){const fo=(frame*0.055+i*0.6)%1;cx.fillStyle=`rgba(200,240,255,${0.28-fo*0.22})`;cx.beginPath();cx.ellipse(80+fo*14,10+fo*4,9+fo*7,2.5-fo,0.2,0,Math.PI*2);cx.fill();}
+  for(let i=0;i<3;i++){const fo=(frame*0.045+i*0.75)%1;cx.fillStyle=`rgba(180,220,255,${0.20-fo*0.16})`;cx.beginPath();cx.ellipse(-82-fo*7,11+fo*3,7+fo*5,2,0,0,Math.PI*2);cx.fill();}
+
+  // 무적 글로우
+  if(hasInvincible){cx.strokeStyle='rgba(255,215,0,0.6)';cx.lineWidth=3;cx.beginPath();cx.ellipse(0,0,95,30,0,0,Math.PI*2);cx.stroke();}
+
+  // ── 캐릭터 ──
+  const px_=-8,py_=-14-42;
+  cx.save();cx.globalAlpha=0.18;cx.fillStyle='#000';cx.beginPath();cx.ellipse(px_+18,-14+3,14,4,0,0,Math.PI*2);cx.fill();cx.restore();
+  drawCharacter(px_,py_,plArmUp);
+  cx.restore();
+}
+
+// 조백호 스프라이트 데이터
+const D_RUN1=['..PPWWWWPP..','.WWWWWWWWWWW','WWWWWWWWWWWW','W.BB.WW.BB.W','WWWWWWWWWWWW','WWWWLLLLWWWW','WWWWLBBLwwww','WWWWWWWWWWWW','.WWWWWWWWWWW','.WWWWWWWWWWW','.WWWWWWWWWWW','..WWWWWWWWWW','..WW.WW.WW..','..WW.WW.WW..'];
+const D_RUN2=['..PPWWWWPP..','.WWWWWWWWWWW','WWWWWWWWWWWW','W.BB.WW.BB.W','WWWWWWWWWWWW','WWWWLLLLWWWW','WWWWLBBLwwww','WWWWWWWWWWWW','.WWWWWWWWWWW','.WWWWWWWWWWW','.WWWWWWWWWWW','..WWWWWWWWWW','...WW.WW.WW.','...WW.WW.WW.'];
+const SPR_PAL={'.':null,'W':'#FFFFFF','w':'#F2F0E8','L':'#D0D0C0','B':'#000000','b':'#222222','P':'#FFB8C8','p':'#E07090'};
+function sprChar(data,ox,oy){
+  const cols=data[0].length;
+  data.forEach((row,ry)=>[...row].forEach((c,rx)=>{
+    if(!SPR_PAL[c])return;
+    cx.fillStyle=SPR_PAL[c];cx.fillRect(ox+rx*PS,oy+ry*PS,PS,PS);
+  }));
+}
+function drawCharacter(ox,oy,armUp){
+  const spr=armUp?D_RUN2:D_RUN1;
+  sprChar(spr,ox,oy);
+  // 눈: col2,3(좌눈) col8,9(우눈) at row3 — 검정으로 확실히
+  const ey=oy+9; // row3 * PS(3)
+  cx.fillStyle='#000000';
+  cx.fillRect(ox+6,  ey, 6, 3); // 왼 눈 (col2~3)
+  cx.fillRect(ox+24, ey, 6, 3); // 오른 눈 (col8~9)
+}
+
+
+// ══════════════════════════════════════════════════
+//  HUD
+// ══════════════════════════════════════════════════
+function drawHUD(){
+  // 하트
+  const hbw=14+maxHearts*34+6;fillR(8,8,hbw,34,'rgba(0,0,0,.5)');
+  for(let i=0;i<maxHearts;i++){
+    const v=hearts-i,hx=14+i*34;
+    [[4,0,8,3],[2,3,12,3],[0,6,16,3],[0,9,16,3],[2,12,12,3],[4,15,8,3],[6,18,4,3]].forEach(([ox,oy,w2,h2])=>{
+      cx.fillStyle=v>=1?'#FF3850':'#333';cx.fillRect(hx+ox,14+oy,w2,h2);
+    });
+  }
+  // 점수
+  fillR(W-218,8,110,34,'rgba(0,0,0,.5)');
+  cx.fillStyle='#FFD700';cx.font='bold 14px Courier New';cx.textAlign='right';
+  cx.fillText(String(score).padStart(6,'0'),W-114,30);
+  // PAUSE
+  const pb=pauseBtnRect;fillR(pb.x,pb.y,pb.w,pb.h,'rgba(0,0,0,0.72)');
+  cx.strokeStyle='#FFD700';cx.lineWidth=2;cx.strokeRect(pb.x,pb.y,pb.w,pb.h);
+  cx.fillStyle='#FFD700';cx.font='bold 15px Courier New';cx.textAlign='center';cx.fillText('❚❚',pb.x+pb.w/2,pb.y+17);
+  cx.fillStyle='rgba(255,215,0,0.75)';cx.font='bold 9px Courier New';cx.fillText('PAUSE',pb.x+pb.w/2,pb.y+30);
+  // 음소거
+  const muted=ChoAudio.isMuted();
+  fillR(W-122,8,48,34,'rgba(0,0,0,0.72)');
+  cx.strokeStyle=muted?'#888':'#4AA8CC';cx.lineWidth=2;cx.strokeRect(W-122,8,48,34);
+  cx.font='16px serif';cx.textAlign='center';cx.fillText(muted?'🔇':'🔊',W-98,30);
+  // 인벤 버튼 (클릭 가능)
+  fillR(W-218,44,82,26,'rgba(0,0,0,0.72)');
+  cx.strokeStyle='#ffd700';cx.lineWidth=1.5;cx.strokeRect(W-218,44,82,26);
+  cx.font='13px serif';cx.textAlign='left';cx.fillText('🎒',W-215,64);
+  cx.fillStyle='#ffd700';cx.font='bold 9px Courier New';cx.fillText('인벤(B)',W-198,64);
+  // 무적
+  if(hasInvincible){
+    fillR(W/2-64,8,128,28,'rgba(0,0,0,.6)');
+    cx.fillStyle='#ffd700';cx.font='bold 11px Courier New';cx.textAlign='center';
+    cx.fillText('🛡 무적 '+Math.ceil(invincibleTimer/60)+'초',W/2,27);
+  }
+  // 항해 진행 바
+  fillR(8,H-22,W-16,13,'rgba(0,0,0,.55)');
+  if(sailProgress>0){
+    const pg=cx.createLinearGradient(8,0,8+(W-16)*sailProgress,0);
+    pg.addColorStop(0,'#2A8EC8');pg.addColorStop(0.5,'#69f0ae');pg.addColorStop(1,'#ffd700');
+    cx.fillStyle=pg;cx.fillRect(8,H-22,(W-16)*sailProgress,13);
+  }
+  cx.font='13px serif';cx.textAlign='center';cx.fillText('⛵',8+(W-16)*Math.max(0.01,sailProgress),H-24);
+  cx.fillStyle='#ffd700';cx.font='bold 10px Courier New';cx.textAlign='right';cx.fillText('★보물섬',W-6,H-24);
+  cx.fillStyle='#aaa';cx.font='10px Courier New';cx.textAlign='left';cx.fillText('⚓',10,H-24);
+  // 세이렌 바위 예고
+  if(!sirenTriggered&&sailProgress>0.35){
+    const pulse=Math.sin(frame*0.1)*0.5+0.5;
+    fillR(W/2-100,H-50,200,22,`rgba(60,20,80,${0.55+pulse*0.2})`);
+    cx.fillStyle=`rgba(200,100,255,${0.8+pulse*0.2})`;cx.font='bold 10px Courier New';cx.textAlign='center';
+    cx.fillText('⚠ 무언가 느껴진다... '+(50-Math.floor(sailProgress*100))+'%',W/2,H-34);
+  }
+  // 섬까지 거리
+  if(islandAlpha>0){
+    fillR(W/2-62,8,124,28,'rgba(0,0,0,.6)');
+    cx.fillStyle='#ffd700';cx.font='bold 11px Courier New';cx.textAlign='center';
+    cx.fillText('★ 섬까지 '+Math.floor((1-sailProgress)*100)+'%',W/2,28);
+  } else if(!sirenTriggered){
+    fillR(8,H-50,160,22,'rgba(0,0,0,.45)');
+    cx.fillStyle='#A8E8FF';cx.font='bold 10px Courier New';cx.textAlign='left';
+    cx.fillText('⛵ 순항 중... '+Math.floor(sailProgress*100)+'%',14,H-34);
+  }
+  // 모바일 상하 버튼
+  [[MB.up,'▲','#69f0ae',mobileUp.pressed],[MB.down,'▼','#82b1ff',mobileDn.pressed]].forEach(([btn,label,col,active])=>{
+    cx.globalAlpha=active?0.85:0.45;
+    fillR(btn.x,btn.y,btn.w,btn.h,'rgba(0,0,0,0.7)');
+    cx.strokeStyle=col;cx.lineWidth=2;cx.strokeRect(btn.x,btn.y,btn.w,btn.h);
+    cx.fillStyle=col;cx.font='bold 22px sans-serif';cx.textAlign='center';
+    cx.fillText(label,btn.x+btn.w/2,btn.y+btn.h/2+8);
+    cx.globalAlpha=1;
+  });
+  // 팝업
+  popups.forEach(p=>{cx.globalAlpha=Math.min(1,p.life/20);cx.fillStyle=p.c;cx.font='bold 12px Courier New';cx.textAlign='center';cx.fillText(p.t,p.x,p.y);cx.globalAlpha=1;});
+}
+
+// ══════════════════════════════════════════════════
+//  인벤토리 — 5장과 동일한 그리드 UI
+// ══════════════════════════════════════════════════
+const INV6D={
+  catAbility:{icon:'😸',name:'고양이 능력',desc:'이중 점프!',color:'#ff8a65'},
+  birdAbility:{icon:'🐦',name:'새 능력',desc:'날기!',color:'#42a5f5'},
+  lifePotion:{icon:'🧪',name:'생명수',desc:'하트 가득!',color:'#69f0ae'},
+  shield:{icon:'🛡️',name:'무적 방패',desc:'30초 무적!',color:'#ffd700'},
+};
+let _sk6='';
+function toggleInv(){
+  if(gs==='playing'){gs='inv';OV.style.display='flex';renderInvGrid6();ChoBGM.pause();}
+  else if(gs==='inv'){gs='playing';OV.style.display='none';ChoBGM.stop();setTimeout(()=>ChoBGM.play(),60);}
+}
+function renderInvGrid6(sk){
+  if(sk===undefined)sk=_sk6;
+  const slots=[];
+  if(inventory.catAbility)slots.push({key:'catAbility',...INV6D.catAbility});
+  if(inventory.birdAbility)slots.push({key:'birdAbility',...INV6D.birdAbility});
+  for(let i=0;i<inventory.lifePotion;i++)slots.push({key:'lp'+i,...INV6D.lifePotion});
+  for(let i=0;i<inventory.shield;i++)slots.push({key:'sh'+i,...INV6D.shield});
+  inventory.items.forEach((it,i)=>slots.push({key:'item_'+i,icon:it.icon||'📦',name:it.name,desc:it.desc||'',color:'#aaa'}));
+  let cells='';
+  for(let i=0;i<24;i++){
+    const s=slots[i];
+    const sel=s&&s.key===sk;
+    const bc=sel?'#ffd700':(s?'#555':'#222');
+    const bg=s?'#1a1a40':'#0a0a18';
+    const cur=s?'pointer':'default';
+    if(s){
+      cells+='<div onclick="_sk6=this.dataset.k;renderInvGrid6(this.dataset.k)" data-k="'+s.key+'" style="aspect-ratio:1;background:'+bg+';border:2px solid '+bc+';border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:calc(min(7vw,32px));cursor:'+cur+'">'+s.icon+'</div>';
+    } else {
+      cells+='<div style="aspect-ratio:1;background:'+bg+';border:2px solid '+bc+';border-radius:6px;"></div>';
+    }
+  }
+  const sel2=sk?slots.find(function(s){return s&&s.key===sk;}):null;
+  let detail='<div style="color:#444;font-size:clamp(16px,2.2vw,24px);margin-top:20px;text-align:center">← 아이템 선택</div>';
+  if(sel2){
+    detail='<div style="text-align:center;font-size:36px;margin-bottom:8px">'+sel2.icon+'</div>'
+      +'<b style="color:'+sel2.color+';font-size:clamp(16px,2.2vw,24px);display:block;margin-bottom:6px">'+sel2.name+'</b>'
+      +'<p style="font-size:clamp(16px,2.2vw,24px);color:#bbb;margin-bottom:12px">'+sel2.desc+'</p>'
+      +'<button class="btn g" data-usekey="'+sk+'" onclick="window.useInv6(this.dataset.usekey)" style="width:100%">사용하기</button>';
+  }
+  PNL.innerHTML=
+    '<div style="display:flex;gap:12px;align-items:flex-start">'
+    +'<div style="flex-shrink:0">'
+    +'<div style="font-size:clamp(14px,1.8vw,20px);color:#888;margin-bottom:6px;text-align:center">🎒 인벤토리</div>'
+    +'<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:5px;width:min(44vw,260px)">'+cells+'</div>'
+    +'</div>'
+    +'<div style="flex:1;min-width:0;padding-top:20px">'+detail+'</div>'
+    +'</div>'
+    +'<button class="btn" style="margin-top:10px;display:block;width:100%" onclick="toggleInv()">닫기 (B)</button>';
+}
+
+window.useInv6=function(key){
+  if(key==='catAbility'){inventory.catAbility=false;popups.push({x:BX,y:boatY-60,t:'😸 이중점프!',c:'#ff8a65',life:70});ChoSFX.item();toggleInv();}
+  else if(key==='birdAbility'){inventory.birdAbility=false;popups.push({x:BX,y:boatY-60,t:'🐦 날기!',c:'#42a5f5',life:70});ChoSFX.item();toggleInv();}
+  else if(key.startsWith('lp')){inventory.lifePotion--;hearts=maxHearts;ChoSFX.item();popups.push({x:BX,y:boatY-60,t:'🧪 하트 가득! ❤️',c:'#69f0ae',life:70});renderInvGrid6();}
+  else if(key.startsWith('sh')){inventory.shield--;hasInvincible=true;invincibleTimer=1800;ChoSFX.item();popups.push({x:BX,y:boatY-60,t:'🛡️ 무적!',c:'#ffd700',life:70});renderInvGrid6();}
+  else if(key.startsWith('item_')){
+    const idx=parseInt(key.replace('item_',''));
+    const item=inventory.items[idx];if(!item)return;
+    // 음식 아이템: fn 있으면 fn 실행, 없어도 isFood면 하트 +1 직접 처리
+    if(item.isFood){
+      if(item.fn&&window[item.fn]){window[item.fn]();}
+      else{
+        hearts=Math.min(maxHearts,hearts+1);
+        ChoSFX.item();
+        inventory.items.splice(idx,1);
+        popups.push({x:BX,y:boatY-60,t:(item.icon||'🍱')+' +1 ❤️',c:'#69f0ae',life:70});
+        renderInvGrid6();
+      }
+      return;
+    }
+    // consumable 아이템: fn 있으면 실행
+    if(item.consumable&&item.fn&&window[item.fn]){window[item.fn]();return;}
+    popups.push({x:BX,y:boatY-60,t:'여기선 쓸 수 없어요',c:'#ff8a65',life:60});renderInvGrid6();
+  }
+  else{popups.push({x:BX,y:boatY-60,t:'여기선 쓸 수 없어요',c:'#ff8a65',life:60});renderInvGrid6();}
+};
+
+// ══════════════════════════════════════════════════
+//  세이렌 미션 (50% 큰 바위)
+// ══════════════════════════════════════════════════
+// 그리스 신화 세이렌 — 노래로 선원을 유혹해 바위로 이끄는 존재
+// 미션: 세이렌의 노래를 무시하고 올바른 선택 3번 → 통과
+
+const SIREN_ROCK_SVG=`
+<svg width="100%" viewBox="0 0 300 120" xmlns="http://www.w3.org/2000/svg" style="display:block;margin:4px auto;max-width:min(600px,96vw)">
+  <!-- 바다 -->
+  <rect width="300" height="120" fill="#1A6EA8"/>
+  <!-- 파도 -->
+  <path d="M0 80 Q25 72 50 80 Q75 88 100 80 Q125 72 150 80 Q175 88 200 80 Q225 72 250 80 Q275 88 300 80 L300 120 L0 120Z" fill="#2A8EC8" opacity="0.5"/>
+  <!-- 큰 바위 -->
+  <ellipse cx="210" cy="72" rx="55" ry="34" fill="#555"/>
+  <ellipse cx="210" cy="66" rx="48" ry="28" fill="#666"/>
+  <ellipse cx="210" cy="60" rx="38" ry="20" fill="#777"/>
+  <!-- 바위 음영 -->
+  <ellipse cx="200" cy="58" rx="20" ry="10" fill="#555" opacity="0.4"/>
+  <!-- 세이렌 (바위 위) -->
+  <ellipse cx="210" cy="38" rx="8" ry="9" fill="#F2C06A"/>
+  <path d="M205 38 Q208 35 210 33 Q212 35 215 38" fill="#8B4513" opacity="0.8"/>
+  <ellipse cx="207" cy="36" rx="1.5" ry="2" fill="#333"/>
+  <ellipse cx="213" cy="36" rx="1.5" ry="2" fill="#333"/>
+  <path d="M207 40 Q210 42 213 40" fill="none" stroke="#CC6060" stroke-width="1"/>
+  <path d="M202 46 Q210 56 218 46" fill="#E8704A" stroke="none"/>
+  <path d="M202 46 Q210 60 218 46 Q215 56 210 58 Q205 56 202 46Z" fill="#DD5A38"/>
+  <!-- 음표 -->
+  <text x="224" y="28" font-size="14" fill="#ffd700" opacity="0.9">♪</text>
+  <text x="180" y="32" font-size="11" fill="#ffd700" opacity="0.7">♫</text>
+  <!-- 배 (왼쪽) -->
+  <rect x="30" y="68" width="60" height="12" rx="4" fill="#8B5A1A"/>
+  <rect x="58" y="40" width="4" height="30" fill="#5A3808"/>
+  <polygon points="60,42 80,55 60,68" fill="rgba(248,244,220,0.9)"/>
+  <!-- 파도 충돌 표시 -->
+  <circle cx="90" cy="68" r="3" fill="rgba(255,200,0,0.6)"/>
+</svg>`;
+
+// 퀴즈 3문제
+const SIREN_QUIZZES=[
+  {
+    q:'"내 노래를 따라오면\n황금을 주겠노라!" — 어떻게 할까?',
+    opts:['노래에 이끌려 바위로 간다','귀를 막고 항로를 유지한다','세이렌에게 인사한다','노래를 따라 부른다'],
+    ans:1,
+    hint:'오디세우스는 밀랍으로 선원들의 귀를 막고 자신은 돛대에 묶어 세이렌의 유혹을 이겨냈어!'
+  },
+  {
+    q:'"이 바위 뒤에 보물이 숨겨져 있어!\n어서 와!" — 어떻게 할까?',
+    opts:['바위 쪽으로 뱃머리를 돌린다','지도의 항로를 따른다','세이렌과 대화를 시작한다','바위에 배를 댄다'],
+    ans:1,
+    hint:'지도에 표시된 항로를 믿어! 세이렌의 말은 거짓이야. 항로를 지켜야 보물섬에 갈 수 있어.'
+  },
+  {
+    q:'세이렌의 노래가 점점 크게 들려온다.\n배가 흔들리기 시작한다!',
+    opts:['노래 소리가 나는 쪽으로 간다','온 힘을 다해 바위를 피한다','잠시 쉬었다가 간다','세이렌이 멈출 때까지 기다린다'],
+    ans:1,
+    hint:'세이렌을 피하는 유일한 방법은 계속 나아가는 것뿐! 멈추면 바위에 부딪혀!'
+  },
+];
+let sirenScore=0,sirenPhase=0;
+
+function showSirenApproach(){
+  // 세이렌 등장 연출 화면 — 버튼 눌러서 다음으로
+  PNL.innerHTML=
+    '<h2 class="mg-title" style="color:#ce93d8;font-size:clamp(26px,4.5vw,44px)">⚠️ 무언가 느껴진다...</h2>'
+    +'<div style="font-size:36px;margin:12px 0;animation:pulse 0.8s infinite">🪨</div>'
+    +'<div style="background:#1a0820;border:2px solid #ce93d8;border-radius:10px;padding:16px;margin:10px 0;text-align:left;line-height:2.1;font-size:clamp(16px,2.2vw,24px)">'
+    +'<span style="color:#aaa;font-style:italic">(안개가 짙어지며 배가 느려진다...)</span><br>'
+    +'<span style="color:#e8c8ff">"♪♫ 이리 와... 아이야... ♫♪"</span><br>'
+    +'<span style="color:#ffd700">저 멀리 바위 위에서 노랫소리가 들려온다!</span>'
+    +'</div>'
+    +'<button class="btn p" style="margin-top:8px;font-size:clamp(18px,2.8vw,32px)" onclick="showSirenEvent()">계속... ▶</button>';
+}
+
+function showSirenEvent(){
+  sirenScore=0;sirenPhase=0;
+  PNL.innerHTML=
+    '<h2 class="mg-title" style="color:#ce93d8">🪨 세이렌의 바위!</h2>'
+    +'<div style="font-size:24px;margin:4px 0">🧜‍♀️🎵🪨⚠️</div>'
+    +SIREN_ROCK_SVG
+    +'<div style="background:#1a0820;border:2px solid #ce93d8;border-radius:8px;padding:12px;margin:8px 0;text-align:left;line-height:1.9;font-size:clamp(15px,2.1vw,22px)">'
+    +'<span style="color:#aaa;font-style:italic">(갑자기 안개가 짙어지더니 거대한 바위가 나타난다!)</span><br>'
+    +'<span style="color:#ce93d8;font-weight:bold">"아이야... 이리 와~ 네가 찾는 보물은 내가 알지~ ♪"</span><br>'
+    +'<span style="color:#aaa">그리스 신화의 세이렌 — 아름다운 노래로 선원을 바위로 유혹하는 존재.</span><br>'
+    +'<span style="color:#ffd700">유혹에 넘어가면 안 돼! 올바른 선택을 3번 하면 통과!</span></div>'
+    +'<div class="btn-row"><button class="btn p" onclick="startSirenQuiz()">맞서겠어! 💪</button>'
+    +'<button class="btn b" onclick="skipSiren()">그냥 지나가기</button></div>';
+}
+
+window.skipSiren=function(){
+  sirenDone=true;sirenSuccess=false;
+  popups.push({x:BX,y:boatY-60,t:'⚠ 겨우 빠져나왔어...',c:'#ce93d8',life:90});
+  OV.style.display='none';gs='playing';
+  ChoBGM.stop();setTimeout(()=>ChoBGM.play(),80);
+  window._puzzleCleanup&&window._puzzleCleanup();window._puzzleCleanup=null;
+};
+
+window.startSirenQuiz=function(){sirenPhase=0;sirenScore=0;showSirenQ(0);};
+
+function showSirenQ(idx){
+  if(idx>=SIREN_QUIZZES.length){sirenQuizEnd();return;}
+  const q=SIREN_QUIZZES[idx];
+  const opts=q.opts.map((opt,i)=>`<button class="btn b" style="width:100%;margin:3px 0;text-align:left;font-size:clamp(14px,1.9vw,21px);padding:clamp(6px,0.9vw,11px) clamp(10px,1.4vw,16px)" onclick="answerSiren(${i},${idx})">${['①','②','③','④'][i]} ${opt}</button>`).join('');
+  PNL.innerHTML=
+    '<h2 class="mg-title" style="color:#ce93d8">🪨 세이렌 도전 ('+(idx+1)+'/3)</h2>'
+    +SIREN_ROCK_SVG
+    +'<div style="background:#1a0820;border:2px solid #ce93d8;border-radius:8px;padding:12px;margin:6px 0;text-align:left">'
+    +'<div class="mg-sub" style="margin-bottom:6px">세이렌: <span style="color:#ce93d8">♪</span></div>'
+    +'<div class="mg-desc" style="white-space:pre-line;line-height:1.8;color:#f0d8ff">'+q.q+'</div></div>'
+    +'<div style="max-width:400px;margin:0 auto">'+opts+'</div>';
+}
+
+window.answerSiren=function(chosen,idx){
+  const q=SIREN_QUIZZES[idx];
+  const correct=chosen===q.ans;
+  if(correct){sirenScore++;hearts=Math.min(maxHearts+3,hearts+1);ChoSFX.item();popups.push({x:BX,y:boatY-60,t:'❤️ +1 세이렌 보상!',c:'#ff85a0',life:80});}
+  const rc=correct?'#69f0ae':'#ff5252';
+  const rt=correct?'✅ 잘 버텼어! ❤️+1':'❌ 잠깐 흔들렸어!';
+  if(!correct){hearts=Math.max(0,hearts-1);ChoSFX.hit();}
+  PNL.innerHTML=
+    '<h2 class="mg-title" style="color:#ce93d8">🪨 세이렌 도전 ('+(idx+1)+'/3)</h2>'
+    +'<div style="background:#1a0820;border:2px solid '+rc+';border-radius:8px;padding:12px;margin:6px 0;text-align:left">'
+    +'<div style="color:'+rc+';font-weight:bold;font-size:clamp(16px,2.2vw,24px);margin-bottom:4px">'+rt+'</div>'
+    +'<div class="mg-desc">정답: <b style="color:#69f0ae">'+q.opts[q.ans]+'</b></div>'
+    +'<div class="mg-sub" style="margin-top:4px">💡 '+q.hint+'</div></div>'
+    +'<p class="mg-sub">현재: '+sirenScore+'/3</p>'
+    +'<button class="btn p" onclick="showSirenQ('+(idx+1)+')">다음 ▶</button>';
+};
+
+function sirenQuizEnd(){
+  const perfect=sirenScore>=3,good=sirenScore>=2;
+  const bonus=perfect?50:good?30:10;
+  score+=bonus;sirenDone=true;sirenSuccess=perfect||good;
+  perfect?ChoSFX.win():ChoSFX.fail();
+  const line=perfect
+    ?'"이런... 쉽지 않은 녀석이군. 어서 가거라!"'
+    :good
+    ?'"아이구... 거의 넘어올 뻔 했는데! 어서 가거라!"'
+    :'"운이 좋았어! 다음엔 못 지나간다!"';
+  PNL.innerHTML='<h2>'+(perfect?'🎉 완벽히 버텼어!':good?'⭐ 잘 버텼어!':'😅 간신히 통과!')+'</h2>'
+    +'<div style="font-size:26px;margin:4px 0">'+(perfect?'⚔️🪨✨':good?'🛡️🪨':'😮💨')+'</div>'
+    +'<div style="background:#1a0820;border:1px solid #ce93d8;padding:10px;margin:8px 0;text-align:left;line-height:1.9;font-size:clamp(15px,2.1vw,22px)">'
+    +'<span style="color:#aaa;font-style:italic">(바위가 서서히 안개 속으로 사라진다...)</span><br>'
+    +'<span style="color:#e8c8ff">세이렌: '+line+'</span></div>'
+    +'<div class="mg-hi">정답: '+sirenScore+' / 3 &nbsp; +'+bonus+'점!</div>'
+    +'<div style="color:#ff85a0;font-weight:bold;font-size:clamp(14px,2vw,22px);margin:4px 0">'+(sirenScore>0?'❤️ ×'+sirenScore+' 획득! (정답 '+sirenScore+'개)':'❤️ 획득 없음')+'</div>'
+    +(perfect?'<div class="mg-sub" style="margin-top:4px;color:#ce93d8">⚓ 오디세우스처럼 세이렌을 완벽히 이겼어!</div>':'')
+    +'<button class="btn p" style="margin-top:8px" onclick="closeSiren()">항해 계속! ⛵</button>';
+}
+
+window.closeSiren=function(){
+  window._puzzleCleanup&&window._puzzleCleanup();window._puzzleCleanup=null;
+  OV.style.display='none';gs='playing';
+  ChoBGM.stop();setTimeout(()=>ChoBGM.play(),80);
+};
+
+// ══════════════════════════════════════════════════
+//  게임 오버
+// ══════════════════════════════════════════════════
+function showGameOver(){
+  OV.style.display='flex';
+  PNL.innerHTML='<h2>💀 게임 오버</h2><p>바다에서 쓰러졌어...</p>'
+    +'<div class="btn-row"><button class="btn g" onclick="initGame();startGame()">다시 도전! ⛵</button></div>';
+}
+
+// ══════════════════════════════════════════════════
+//  도착 패널
+// ══════════════════════════════════════════════════
+function showLandingPanel(){
+  OV.style.display='flex';
+  const items=inventory.items;
+  localStorage.setItem('ch6_save',JSON.stringify({
+    score,hearts,maxHearts,
+    dogType:ch5Save.dogType||'chiwa',dogAdopted:false,strayDogName:'',
+    catAbility:inventory.catAbility,catEquipped:inventory.catAbility,
+    birdAbility:inventory.birdAbility,birdEquipped:inventory.birdAbility,
+    lifePotion:inventory.lifePotion,shield:inventory.shield,
+    items,treasureQuizScore:ch5Save.treasureQuizScore||0,
+    sirenScore,sirenSuccess,sailDone:true,
+  }));
+  const achs=[];
+  if(sirenScore>=3)achs.push('⚔️ 세이렌 완파');
+  if(sirenScore>=1)achs.push('🪨 바위 통과');
+  PNL.innerHTML=
+    '<h2 style="color:#ffd700">⚓ 보물섬 상륙!</h2>'
+    +'<div style="font-size:30px;margin:8px 0">🏝️⛵🌴✨</div>'
+    +'<div style="background:#0a1a0a;border:2px solid #69f0ae;border-radius:10px;padding:14px;margin:10px 0;text-align:left;line-height:2;font-size:clamp(16px,2.2vw,24px)">'
+    +'<span style="color:#aaa;font-style:italic">(돛단배가 모래사장에 부드럽게 닿는다...)</span><br>'
+    +'<span style="color:#eee">"저기야! 야자나무 세 그루! 지도에서 봤던 그곳이야!"</span><br>'
+    +'<span style="color:#ffd700;font-weight:bold">"드디어... 보물섬에 도착했어! 🏝️"</span><br>'
+    +'<span style="color:#69f0ae">"이제 보물을 찾아야지! 별자리 지도를 따라가면..."</span>'
+    +'</div>'
+    +(achs.length?'<div class="mg-hi" style="margin:4px 0">'+achs.join(' · ')+'</div>':'')
+    +'<div class="btn-row" style="margin-top:12px">'
+    +'<button class="btn g" onclick="showLeaderboard()">항해 기록 🏆</button>'
+    +'<button class="btn" style="background:#ffd700;color:#111" onclick="goToChapter7()">7장: 보물을 찾아라! ▶</button>'
+    +'<button class="btn r" onclick="initGame();startGame()">처음부터</button>'
+    +'</div>';
+}
+
+window.goToChapter7=function(){alert('7장이 곧 준비됩니다! 🏝️');};
+
+// ══════════════════════════════════════════════════
+//  리더보드
+// ══════════════════════════════════════════════════
+const LB_KEY='chobaekho_ch6_lb';
+function loadLB(){try{return JSON.parse(localStorage.getItem(LB_KEY)||'[]');}catch(e){return[];}}
+function saveLBD(e){try{localStorage.setItem(LB_KEY,JSON.stringify(e));}catch(e){}}
+function addLBEntry(name,pts){let e=loadLB();const now=new Date();const d=now.getFullYear()+'.'+(now.getMonth()+1).toString().padStart(2,'0')+'.'+now.getDate().toString().padStart(2,'0');e.push({name:name||'익명',score:pts,date:d});e.sort((a,b)=>b.score-a.score);if(e.length>20)e=e.slice(0,20);saveLBD(e);return e;}
+function renderLBRows(entries,hi){
+  if(!entries.length)return'<p style="color:#555">아직 기록이 없어요!</p>';
+  return'<table style="width:100%;border-collapse:collapse"><tr>'+['순위','이름','점수','날짜'].map(h=>'<th style="color:#888;font-size:clamp(13px,1.7vw,19px);padding:3px">'+h+'</th>').join('')+'</tr>'+entries.map((e,i)=>'<tr style="background:'+(i===hi?'rgba(255,215,0,0.15)':'')+'"><td style="color:#888;font-size:clamp(13px,1.7vw,19px);padding:3px">'+(i===0?'🥇':i===1?'🥈':i===2?'🥉':'#'+(i+1))+'</td><td style="color:'+(i===hi?'#fff':'#ccc')+';font-size:clamp(13px,1.7vw,19px);padding:3px">'+e.name+'</td><td style="color:#ffd700;font-size:clamp(15px,2vw,22px);font-weight:bold;padding:3px">'+e.score+'</td><td style="color:#555;font-size:clamp(13px,1.7vw,19px);padding:3px">'+e.date+'</td></tr>').join('')+'</table>';
+}
+window.showLeaderboard=()=>{const entries=loadLB();PNL.innerHTML='<h2>🏆 항해 기록 (6장)</h2><p style="color:#ffd700">이번 점수: <b>'+score+'</b></p><div style="margin:8px 0"><input id="lb_name" maxlength="10" placeholder="이름 입력" style="background:#1a1a30;border:2px solid #ffd700;color:#fff;padding:6px 10px;font-size:clamp(16px,2.2vw,24px);font-family:Courier New;width:min(180px,60vw);text-align:center;"></div><div class="btn-row"><button class="btn g" onclick="submitLB()">기록 등록!</button><button class="btn b" onclick="skipLB()">그냥 보기</button></div><div id="lb_list" style="margin-top:8px">'+renderLBRows(entries,-1)+'</div>';};
+window.submitLB=()=>{const inp=document.getElementById('lb_name');const name=inp?inp.value.trim():'';const entries=addLBEntry(name,score);const myIdx=entries.findIndex(e=>e.score===score&&e.name===(name||'익명'));const lb=document.getElementById('lb_list');if(lb)lb.innerHTML=renderLBRows(entries,myIdx);const btn=document.querySelector('.btn.g');if(btn){btn.textContent='✅ 등록됨!';btn.disabled=true;}};
+window.skipLB=()=>{const entries=loadLB();PNL.innerHTML='<h2>🏆 항해 기록 (6장)</h2>'+renderLBRows(entries,-1)+'<button class="btn g" style="margin-top:8px" onclick="initGame();startGame()">다시 항해!</button>';};
+
+// ══════════════════════════════════════════════════
+//  튜토리얼 / 일시정지
+// ══════════════════════════════════════════════════
+let tutPage=0;
+const TUT_PAGES=[
+  {title:'⛵ 6장: 보물섬으로!',content:`
+    <div class="tut-row"><span class="tut-icon">↑↓</span><span class="tut-text">↑/↓ 키 또는 오른쪽 ▲▼ 버튼으로 <b style="color:#69f0ae">배를 위아래로 이동</b>해 장애물을 피해요!</span></div>
+    <div class="tut-row"><span class="tut-icon">🐠</span><span class="tut-text">물고기, 문어, 해파리, 거북이, 꽃게가 날아와요. 닿으면 ❤️ -1!</span></div>
+    <div class="tut-row"><span class="tut-icon">🪨</span><span class="tut-text">50% 지점에서 <b style="color:#ce93d8">세이렌의 바위</b> 등장! 그리스 신화 퀴즈로 통과해요.</span></div>
+    <div class="tut-row"><span class="tut-icon">🎒</span><span class="tut-text">인벤토리: B 키 &nbsp; 일시정지: P 키</span></div>
+  `},
+];
+function showTutorial(){gs='howto';tutPage=0;OV.style.display='flex';renderTut();ChoAudio.getCtx();}
+function renderTut(){
+  const p=TUT_PAGES[tutPage],isLast=tutPage===TUT_PAGES.length-1;
+  PNL.innerHTML='<h2>'+p.title+'</h2><div style="margin:8px 0">'+p.content+'</div>'
+    +(isLast?'<button class="btn g" onclick="startGame()">출발! ⛵</button>':'<button class="btn g" onclick="nextTut()">다음 ▶</button>');
+}
+function nextTut(){tutPage++;renderTut();}
+window.nextTut=nextTut;
+
+function togglePause(){
+  if(gs==='playing'){gs='paused';OV.style.display='flex';ChoBGM.pause();
+    PNL.innerHTML='<h2>⏸ 일시정지</h2><p class="mg-sub">항해: '+Math.floor(sailProgress*100)+'% &nbsp; ❤️: '+hearts+'/'+maxHearts+'</p>'
+      +'<div class="btn-row"><button class="btn g" onclick="togglePause()">계속 항해! ⛵</button><button class="btn r" onclick="initGame();startGame()">처음부터</button></div>';}
+  else if(gs==='paused'){gs='playing';OV.style.display='none';ChoBGM.stop();setTimeout(()=>ChoBGM.play(),80);}
+}
+
+function startGame(){OV.style.display='none';gs='playing';ChoBGM.stop();setTimeout(()=>ChoBGM.play(),60);}
+window.startGame=startGame;
+
+// ══════════════════════════════════════════════════
+//  타이틀
+// ══════════════════════════════════════════════════
+function drawTitle(){
+  const sky=cx.createLinearGradient(0,0,0,HORIZON);
+  sky.addColorStop(0,'#4AB8F0');sky.addColorStop(1,'#A8E8FF');
+  cx.fillStyle=sky;cx.fillRect(0,0,W,HORIZON);
+  clouds.filter(c=>c.far).forEach(drawCloud);
+  const sea=cx.createLinearGradient(0,HORIZON,0,H);
+  sea.addColorStop(0,'#3AACE0');sea.addColorStop(1,'#1A6EA8');
+  cx.fillStyle=sea;cx.fillRect(0,HORIZON,W,H-HORIZON);
+  cx.strokeStyle='rgba(180,230,255,0.25)';cx.lineWidth=1.5;
+  cx.beginPath();for(let x=0;x<=W;x+=4)cx.lineTo(x,HORIZON+12+Math.sin(x*0.02+frame*0.04)*5);cx.stroke();
+  clouds.filter(c=>!c.far).forEach(drawCloud);
+  cx.fillStyle='rgba(255,245,175,0.95)';cx.beginPath();cx.arc(W*0.76,52,20,0,Math.PI*2);cx.fill();
+  seagulls.forEach(s=>{cx.strokeStyle='rgba(40,40,40,0.6)';cx.lineWidth=1.5;cx.beginPath();cx.moveTo(s.x-4,s.y+Math.sin(s.wa)*3);cx.quadraticCurveTo(s.x,s.y-2,s.x+4,s.y+Math.sin(-s.wa)*3);cx.stroke();});
+  // 배 (타이틀)
+  const tby=HORIZON+24+Math.sin(frame*0.025)*5;
+  cx.save();cx.translate(BX,tby);cx.rotate(Math.sin(frame*0.02)*0.045);
+  cx.fillStyle='#8B5A1A';cx.beginPath();cx.moveTo(-62,-8);cx.lineTo(62,-8);cx.quadraticCurveTo(76,6,66,16);cx.lineTo(-66,16);cx.quadraticCurveTo(-76,6,-62,-8);cx.closePath();cx.fill();
+  cx.fillStyle='#5A3808';cx.fillRect(-2,-70,5,62);
+  cx.fillStyle='#F5EDD4';cx.beginPath();cx.moveTo(0,-68);cx.lineTo(44,-40);cx.lineTo(44,-10);cx.lineTo(-44,-10);cx.lineTo(-44,-40);cx.closePath();cx.fill();
+  cx.fillStyle='#ffd700';cx.beginPath();cx.moveTo(0,-72);cx.lineTo(16,-64);cx.lineTo(0,-56);cx.closePath();cx.fill();
+  drawCharacter(-8,-10-42,false);
+  cx.restore();
+  fillR(W/2-226,48,452,308,'rgba(8,18,38,0.87)');
+  cx.strokeStyle='#ffd700';cx.lineWidth=3;cx.strokeRect(W/2-226,48,452,308);
+  cx.fillStyle='#FFD700';cx.font='bold 26px Courier New';cx.textAlign='center';cx.fillText('🐾 조백호의 여행',W/2,94);
+  cx.fillStyle='#69f0ae';cx.font='18px Courier New';cx.fillText('6장: 보물섬으로! ⛵',W/2,126);
+  cx.fillStyle='#aaa';cx.font='12px Courier New';
+  cx.fillText('↑↓ 조작으로 바다 생물을 피하며 항해!',W/2,158);
+  cx.fillStyle='#ce93d8';cx.fillText('🪨 세이렌의 바위를 조심해!',W/2,182);
+  if(ch5Save.treasureQuizScore>0){cx.fillStyle='#4AA8CC';cx.font='10px Courier New';cx.fillText('5장 퀴즈 '+ch5Save.treasureQuizScore+'/3 달성',W/2,206);}
+  if(Math.floor(frame/22)%2===0){cx.fillStyle='#FFD700';cx.font='bold 13px Courier New';cx.fillText('[ SPACE / 클릭 ]',W/2,244);}
+}
+
+// ══════════════════════════════════════════════════
+//  메인 루프
+// ══════════════════════════════════════════════════
+function loop(){
+  requestAnimationFrame(loop);cx.clearRect(0,0,W,H);
+  if(gs==='title'){
+    frame++;
+    clouds.forEach(cl=>{cl.x-=cl.speed*(cl.far?0.4:0.7);if(cl.x<-cl.r*3)cl.x=W+cl.r*3;});
+    seagulls.forEach(s=>{s.x+=s.vx;s.wb+=0.04;s.y+=Math.sin(s.wb)*0.3;s.wa+=0.12*s.wd;if(Math.abs(s.wa)>0.44)s.wd*=-1;if(s.x>W+30){s.x=-10;s.y=35+Math.random()*80;}});
+    drawTitle();return;
+  }
+  if(gs==='playing')update();
+  drawBG();
+  drawObstacles();
+  drawBoatAndPlayer();
+  drawHUD();
+}
+
+OV.style.display='none';gs='title';
+initGame();
+loop();
+</script>
+</body>
+</html>
