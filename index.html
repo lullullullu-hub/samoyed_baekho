@@ -94,20 +94,27 @@ button,input,textarea{font:inherit}
   line-height:1.3;
 }
 .main-actions,.menu-actions,.chapter-row,.link-row{
-  display:flex;
+   display:flex;
   gap:12px;
   flex-wrap:wrap;
+  align-items:center;   /* ⭐ 세로 정렬 */
+  margin-top:12px;      /* ⭐ 줄 간격 */
 }
 .main-actions{margin-top:36px}
 .menu-actions{margin-top:18px}
 .btn{
-  border:1px solid var(--text);
+ border:1px solid var(--text);
   background:var(--text);
   color:var(--bg);
   padding:14px 22px;
   border-radius:999px;
   cursor:pointer;
   font-size:16px;
+
+  min-height:52px;              /* ⭐ 높이 통일 */
+  display:inline-flex;          /* ⭐ 중앙 정렬 */
+  align-items:center;
+  justify-content:center;
 }
 .btn.secondary{
   background:transparent;
@@ -426,7 +433,7 @@ button,input,textarea{font:inherit}
         <div class="panel-stack">
           <div class="panel">
             <h3>조백호의 여행</h3>
-            <p>게임으로 백호의 여행을 가볍게 즐겨보세요.</p>
+            <p>게임으로 백호와 여행을 함께 떠나보세요.</p>
             <div class="small">현재 백호는 보물섬을 여행중...(7장)</div>
             <div class="link-row">
               <button class="btn" onclick="openGame('./game/chapter1/Index.html')">게임 시작</button>
