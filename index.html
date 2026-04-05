@@ -130,7 +130,7 @@ button,input,textarea{font:inherit}
   display:flex;              /* grid → flex로 변경 */
   flex-direction:column;
   gap:16px;
-}}
+}
 .slider-stage{
   position:relative;
   width:100%;
@@ -712,10 +712,10 @@ document.getElementById('leaderboardModal').addEventListener('click', function(e
 });
 
 const heroImages = [
-  { src: 'images/baekho-01.jpg', alt: '백호 정면 사진 1' },
-  { src: 'images/baekho-02.jpg', alt: '백호 사진 2' },
-  { src: 'images/baekho-03.jpg', alt: '백호 사진 3' },
-  { src: 'images/baekho-04.jpg', alt: '백호 사진 4' }
+  { src: './images/baekho-01.jpg', alt: '백호 정면 사진 1' },
+  { src: './images/baekho-02.jpg', alt: '백호 사진 2' },
+  { src: './images/baekho-03.jpg', alt: '백호 사진 3' },
+  { src: './images/baekho-04.jpg', alt: '백호 사진 4' }
 ];
 
 let heroIndex = 0;
@@ -728,7 +728,7 @@ function renderHeroSlider(){
 
   slidesEl.innerHTML = heroImages.map((item, i) => `
     <figure class="slide ${i === heroIndex ? 'active' : ''}">
-      <img src="${item.src}" alt="${item.alt}" loading="${i === 0 ? 'eager' : 'lazy'}">
+      <img src="${item.src}" alt="${item.alt}" loading="${i === 0 ? 'eager' : 'lazy'}" onerror="this.style.display='none'; console.log('이미지 로드 실패:', '${item.src}')">
     </figure>
   `).join('');
 
