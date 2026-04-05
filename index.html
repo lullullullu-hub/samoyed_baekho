@@ -350,12 +350,12 @@ button,input,textarea{font:inherit}
 </head>
 <body>
 <div class="shell">
-<div class="nav">
-  <button type="button" class="active" data-page="0">메인</button>
-  <button type="button" data-page="1">게임</button>
-  <button type="button" data-page="2">레터</button>
-  <button type="button" data-page="3">굿즈</button>
-</div>
+  <div class="nav">
+    <button class="active" onclick="go(0)">메인</button>
+    <button onclick="go(1)">게임</button>
+    <button onclick="go(2)">레터</button>
+    <button onclick="go(3)">굿즈</button>
+  </div>
 
   <section class="page active">
     <div class="frame">
@@ -365,11 +365,11 @@ button,input,textarea{font:inherit}
         <div class="hero-sub">덩치큰 하얀 강아지, 백호의 이야기가 <br>천천히 쌓이는 공간.</div>
         <div id="randomText" class="random-line"></div>
 
-<div class="main-actions">
-  <button type="button" class="btn" data-page="1">게임</button>
-  <button type="button" class="btn secondary" data-page="2">레터</button>
-  <button type="button" class="btn secondary">백호 스토리</button>
-</div>
+        <div class="main-actions">
+          <button class="btn" onclick="go(1)">게임</button>
+          <button class="btn secondary" onclick="go(2)">레터</button>
+          <button class="btn secondary">백호 스토리</button>
+        </div>
 
         <div class="small" style="margin-top:16px; max-width:460px; line-height:1.6; color:var(--soft);">
           2023년 봄의 시작즈음, 백호는 어미강아지의 공격에 겨우 살아난 이후,<br>
@@ -423,7 +423,7 @@ button,input,textarea{font:inherit}
       <div class="content-wrap">
         <div class="left">
           <div class="eyebrow">Game /</div>
-          <h2 class="big-title">enjoy<br>with 백호</h2>
+          <h2 class="big-title">같이 즐기는<br>백호 이야기</h2>
           <div class="desc">게임, 소설, 웹툰 등 다양한 컨텐츠가 쌓일거에요.</div>
         </div>
         <div class="panel-stack">
