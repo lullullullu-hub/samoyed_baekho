@@ -455,14 +455,13 @@ button,input,textarea{font:inherit}
     </div>
   </section>
 
-function openGameTab(url){
-  let gameTab = window.open('', 'baekhoGame');
-
+ffunction openGameTab(url){
+  const gameTab = window.open('', 'baekhoGame');
   if (gameTab) {
     gameTab.location.href = url;
     gameTab.focus();
   } else {
-    alert('팝업이 차단되었습니다. 허용해주세요.');
+    alert('게임 탭이 차단되었어요. 브라우저에서 팝업을 허용해주세요.');
   }
 }
 
