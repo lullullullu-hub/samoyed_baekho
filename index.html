@@ -122,7 +122,7 @@ button,input,textarea{font:inherit}
   position:relative;
   display:flex;
   align-items:stretch;
-  justify-content:flex-end;
+  justify-content:flex-start;
 }
 .hero-slider{
   width:100%;
@@ -225,15 +225,17 @@ button,input,textarea{font:inherit}
 }
 .slider-caption{
   display:flex;
-  justify-content:space-between;
+  flex-direction:column;
+  justify-content:flex-start;
   gap:12px;
   align-items:flex-start;
+  text-align:left;
 }
 .slider-note{
   display:flex;
   flex-direction:column;
   gap:10px;
-  align-items:flex-end;
+  align-items:flex-start;
   font-size:18px;
 }
 .slider-note span{
@@ -249,11 +251,12 @@ button,input,textarea{font:inherit}
 }
 .slider-meta{
   display:flex;
-  justify-content:space-between;
-  gap:12px;
+  justify-content:flex-start;
+  gap:24px;
   align-items:center;
   color:var(--soft);
   font-size:15px;
+  text-align:left;
 }
 .content-wrap{
   display:grid;
@@ -339,7 +342,7 @@ button,input,textarea{font:inherit}
   .hero-title{font-size:64px}
   .big-title{font-size:52px}
   .poster-area{min-height:340px}
-  .hero-slider{min-height:420px}
+  .hero-slider{min-height:420px;width:100%}
   .slider-stage{min-height:340px}
   .slider-caption,.slider-meta{flex-direction:column;align-items:flex-start}
   .slider-note{align-items:flex-start}
