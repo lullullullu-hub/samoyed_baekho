@@ -121,15 +121,16 @@ button,input,textarea{font:inherit}
   height:100%;
   position:relative;
   display:flex;
-  align-items:stretch;
-  justify-content:flex-start;
+  align-items:flex-start;
+  justify-content:flex-end;
 }
 .hero-slider{
-  width:100%;
-  height:100%;
-  display:flex;              /* grid → flex로 변경 */
+  width:min(78%, 560px);
+  height:auto;
+  display:flex;
   flex-direction:column;
-  gap:16px;
+  gap:10px;
+  margin-left:auto;
 }
 .slider-stage{
   position:relative;
@@ -211,32 +212,31 @@ button,input,textarea{font:inherit}
   background:#fff;
 }
 .info-block{
-  max-width:380px;
+  max-width:300px;
   text-align:left;
 }
 .info-title{
-  font-size:22px;
-  margin:0 0 8px;
+  font-size:20px;
+  margin:0 0 6px;
 }
 .info-copy{
   margin:0;
   color:var(--soft);
-  line-height:1.5;
+  line-height:1.45;
+  font-size:15px;
 }
 .slider-caption{
   display:flex;
-  flex-direction:column;
-  justify-content:flex-start;
-  gap:12px;
+  justify-content:space-between;
+  gap:10px;
   align-items:flex-start;
-  text-align:left;
 }
 .slider-note{
   display:flex;
   flex-direction:column;
-  gap:10px;
-  align-items:flex-start;
-  font-size:18px;
+  gap:8px;
+  align-items:flex-end;
+  font-size:16px;
 }
 .slider-note span{
   display:flex;
@@ -251,12 +251,11 @@ button,input,textarea{font:inherit}
 }
 .slider-meta{
   display:flex;
-  justify-content:flex-start;
-  gap:24px;
+  justify-content:space-between;
+  gap:10px;
   align-items:center;
   color:var(--soft);
-  font-size:15px;
-  text-align:left;
+  font-size:14px;
 }
 .content-wrap{
   display:grid;
@@ -342,7 +341,7 @@ button,input,textarea{font:inherit}
   .hero-title{font-size:64px}
   .big-title{font-size:52px}
   .poster-area{min-height:340px}
-  .hero-slider{min-height:420px;width:100%}
+  .hero-slider{min-height:420px;width:100%;max-width:none;margin-left:0}
   .slider-stage{min-height:340px}
   .slider-caption,.slider-meta{flex-direction:column;align-items:flex-start}
   .slider-note{align-items:flex-start}
