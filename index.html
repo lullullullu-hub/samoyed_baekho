@@ -606,7 +606,7 @@ function continueGame(){
   else if(localStorage.getItem('ch4_save')) url = './game/chapter5/Index.html';
   else if(localStorage.getItem('ch3_save')) url = './game/chapter4/Index.html';
   else if(localStorage.getItem('ch2_save')) url = './game/chapter3/Index.html';
-  else if(localStorage.getItem('ch1_save')) url = './game/chapter2/Index.html';
+  else if(localStorage.getItem('ch1_save', 'done')) url = './game/chapter2/Index.html';
   openGame(url);
 }
 
